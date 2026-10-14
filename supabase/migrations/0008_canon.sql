@@ -3,6 +3,8 @@
 alter table public.characters
   add column canon_source text not null default '' check (char_length(canon_source) <= 200),
   add column canon smallint not null default 50 check (canon between 0 and 100),
+  -- which part of the source to take canon from, e.g. "anime, season 2 through the Shibuya arc (ep 41)"
+  add column canon_context text not null default '' check (char_length(canon_context) <= 2000),
   add column real_person boolean not null default false;
 -- sexual content about real people is a legal minefield (deepfake / likeness laws), so real-person bots stay non-nsfw
 alter table public.characters add constraint real_person_never_nsfw check (not real_person or not nsfw);
@@ -14,7 +16,7 @@ select
   case when c.anonymous then null else c.creator_id end as creator_id,
   case when c.anonymous then null else p.display_name end as creator_name,
   case when c.anonymous then null else p.username end as creator_username,
-  c.minor, c.background, c.traits, c.quirks, c.warmup, c.canon_source, c.canon, c.real_person
+  c.minor, c.background, c.traits, c.quirks, c.warmup, c.canon_source, c.canon, c.canon_context, c.real_person
 from public.characters c
 join public.profiles p on p.id = c.creator_id
 where c.visibility in ('public', 'unlisted') or c.creator_id = auth.uid();

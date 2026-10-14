@@ -11,7 +11,7 @@ export type ImportedBot = {
   greeting: string;
   tags: string[];
   source: string;
-  extra?: Partial<Pick<Character, "background" | "traits" | "quirks" | "warmup" | "minor" | "canon_source" | "canon" | "real_person">>; // our own fields, from extensions.mirrorai
+  extra?: Partial<Pick<Character, "background" | "traits" | "quirks" | "warmup" | "minor" | "canon_source" | "canon" | "canon_context" | "real_person">>; // our own fields, from extensions.mirrorai
 };
 export type ImportedMessage = { role: "user" | "assistant"; content: string };
 // memoryCovers: how many leading messages the memory summary already covers
@@ -35,7 +35,7 @@ export function exportChat(c: Character, messages: Message[], memory: string, pi
         mes_example: "",
         creator_notes: c.tagline ?? "",
         tags: c.tags,
-        extensions: { mirrorai: { background: c.background, traits: c.traits, quirks: c.quirks, warmup: c.warmup, minor: c.minor, canon_source: c.canon_source, canon: c.canon, real_person: c.real_person } },
+        extensions: { mirrorai: { background: c.background, traits: c.traits, quirks: c.quirks, warmup: c.warmup, minor: c.minor, canon_source: c.canon_source, canon: c.canon, canon_context: c.canon_context, real_person: c.real_person } },
       },
     },
     memory,

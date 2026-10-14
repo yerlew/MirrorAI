@@ -28,7 +28,7 @@ const cors = {
 
 type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
   background: string; traits: string[]; quirks: Quirk[]; warmup: "never" | "slow" | "normal";
-  canon_source: string; canon: number; real_person: boolean;
+  canon_source: string; canon: number; canon_context: string; real_person: boolean;
 };
 type Quirk = { text: string; frequency: "always" | "often" | "sometimes" | "rarely" };
 type Row = { id: number; role: "user" | "assistant"; content: string };
@@ -107,18 +107,19 @@ function characterCheck(c: Character, userTurns: number) {
 function canonNote(c: Character) {
   const source = c.canon_source?.trim();
   if (!source) return "";
-  const who = c.real_person
-    ? `${c.name} is based on a real person (${source}). Draw on their public persona: how they talk, their known work and public history.`
-    : `${c.name} is the character from ${source}. Draw on what you know of that source: their personality, speech patterns, abilities, relationships and history.`;
+  if (c.real_person) {
+    return `<source>\n${c.name} is based on a real person (${source}). Draw on their public persona: how they talk, their known work and public history. This is fiction inspired by them: never present invented private details, scandals or claims as real facts about them.\n</source>`;
+  }
+  const who = `${c.name} is the character from ${source}. Draw on what you know of that source: their personality, speech patterns, abilities, relationships and history.`;
   const level = c.canon >= 70
     ? "Stick closely to canon. Don't contradict established facts, relationships or events, and keep their canon voice. Where the creator's notes below add detail, they extend canon."
     : c.canon >= 35
       ? "Canon-inspired. Keep their canon personality, voice and backstory, but the story here can diverge from canon events. The creator's notes below win where they differ."
       : "Loose / alternate universe. Use canon only for their name, look and broad vibe; the creator's notes below define everything else.";
-  const realPerson = c.real_person
-    ? " This is fiction inspired by a real person: never present invented private details, scandals or claims as real facts about them."
+  const context = c.canon_context?.trim()
+    ? `\nTake canon from this part of the source only: ${c.canon_context.trim()}\nAs far as you know, nothing after that point has happened yet; don't reference later events, deaths, reveals or character changes.`
     : "";
-  return `<source>\n${who} ${level}${realPerson}\n</source>`;
+  return `<source>\n${who} ${level}${context}\n</source>`;
 }
 
 /** the built-in filter. non-nsfw bots stay non-explicit; minors are never sexualized on any bot. */

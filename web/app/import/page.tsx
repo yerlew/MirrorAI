@@ -19,6 +19,7 @@ function personality(x: ImportedBot["extra"]) {
     minor: x.minor === true,
     canon_source: str(x.canon_source).slice(0, 200),
     canon: typeof x.canon === "number" ? Math.max(0, Math.min(100, Math.round(x.canon))) : 50,
+    canon_context: str(x.canon_context).slice(0, 2000),
     real_person: x.real_person === true,
   };
 }

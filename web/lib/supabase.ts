@@ -32,7 +32,8 @@ export type Character = {
   quirks: Quirk[];
   warmup: Warmup;
   canon_source: string; // e.g. "Jujutsu Kaisen", or the celebrity's name. empty = original character
-  canon: number; // 0 loose / AU … 100 strict canon
+  canon: number; // 0 loose / AU … 100 strict canon. not used for real people
+  canon_context: string; // which part of the source canon comes from, e.g. season / episode
   real_person: boolean;
   anonymous: boolean;
 };

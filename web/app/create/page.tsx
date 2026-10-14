@@ -22,6 +22,7 @@ export default function Create() {
   const [basedOn, setBasedOn] = useState<"original" | "character" | "real">("original");
   const [canonSource, setCanonSource] = useState("");
   const [canon, setCanon] = useState(70);
+  const [canonContext, setCanonContext] = useState("");
   const toggleTrait = (t: string) => setTraits((ts) => (ts.includes(t) ? ts.filter((x) => x !== t) : ts.length < 20 ? [...ts, t] : ts));
   function addCustomTrait() {
     const t = customTrait.trim().slice(0, 40);
@@ -56,6 +57,7 @@ export default function Create() {
       warmup,
       canon_source: basedOn === "original" ? "" : canonSource.trim(),
       canon,
+      canon_context: basedOn === "character" ? canonContext.trim() : "",
       real_person: basedOn === "real",
       tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean),
       creator_id: auth.user.id,
@@ -93,17 +95,24 @@ export default function Create() {
             <>
               <input placeholder={basedOn === "real" ? "who, e.g. their name and what they're known for" : "from what, e.g. Jujutsu Kaisen (anime/manga)"}
                 value={canonSource} maxLength={200} onChange={(e) => setCanonSource(e.target.value)} required />
-              <label className="canon">
-                <span>non-canon</span>
-                <input type="range" min={0} max={100} step={5} value={canon} onChange={(e) => setCanon(Number(e.target.value))} />
-                <span>canon</span>
-              </label>
-              <span className="muted">
-                {canon >= 70 && "Sticks to canon: personality, voice, relationships and events from the source. Your notes below add to it."}
-                {canon >= 35 && canon < 70 && "Canon-inspired: canon personality and backstory, but the story can go its own way. Your notes win where they differ."}
-                {canon < 35 && "Non-canon / AU: only the name, look and vibe come from the source. Your notes define the rest."}
-                {basedOn === "real" && " Real-person bots can't be 18+."}
-              </span>
+              {basedOn === "character" && (
+                <>
+                  <label className="canon">
+                    <span>non-canon</span>
+                    <input type="range" min={0} max={100} step={5} value={canon} onChange={(e) => setCanon(Number(e.target.value))} />
+                    <span>canon</span>
+                  </label>
+                  <span className="muted">
+                    {canon >= 70 && "Sticks to canon: personality, voice, relationships and events from the source. Your notes below add to it."}
+                    {canon >= 35 && canon < 70 && "Canon-inspired: canon personality and backstory, but the story can go its own way. Your notes win where they differ."}
+                    {canon < 35 && "Non-canon / AU: only the name, look and vibe come from the source. Your notes define the rest."}
+                  </span>
+                  <textarea rows={3} maxLength={2000} value={canonContext} onChange={(e) => setCanonContext(e.target.value)}
+                    placeholder="canon context: where to take canon from, e.g. anime only, seasons 1-2, up to ep 41 (Shibuya arc). no manga spoilers past that." />
+                  <span className="muted">The bot acts like nothing after this point has happened yet.</span>
+                </>
+              )}
+              {basedOn === "real" && <span className="muted">Uses their public persona. Real-person bots can't be 18+.</span>}
             </>
           )}
         </div>
