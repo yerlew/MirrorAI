@@ -14,6 +14,9 @@ struct CreateCharacterView: View {
     @State private var categories: Set<CategoryFilter> = []
     @State private var aiArt = false
     @State private var artCredit = ""
+    @State private var nsfw = false
+    @State private var nsfwCover = false
+    @State private var anonymous = false
     @State private var saving = false
     @State private var error: String?
     @State private var created: Character?
@@ -54,6 +57,13 @@ struct CreateCharacterView: View {
                 TextEditor(text: $greeting).frame(minHeight: 60)
             }
             Section {
+                Toggle("This bot is 18+", isOn: $nsfw)
+                if !nsfw { Toggle("The cover image is 18+", isOn: $nsfwCover) }
+                Toggle("Post anonymously", isOn: $anonymous)
+            } footer: {
+                Text("18+ bots only show on the website for adults who turned the filter off. Anonymous hides your name and profile on this bot.")
+            }
+            Section {
                 TextField("Tags, comma separated", text: $tags)
                 Picker("Visibility", selection: $visibility) {
                     Text("Public").tag("public")
@@ -91,7 +101,10 @@ struct CreateCharacterView: View {
                     gender: gender.isEmpty ? nil : gender,
                     categories: categories.map(\.rawValue).sorted(),
                     aiArt: aiArt,
-                    artCredit: aiArt || artCredit.isEmpty ? nil : artCredit)
+                    artCredit: aiArt || artCredit.isEmpty ? nil : artCredit,
+                    nsfw: nsfw,
+                    nsfwCover: nsfw || nsfwCover,
+                    anonymous: anonymous)
                 created = try await Supabase.insert("characters", row, token: token)
             } catch {
                 self.error = error.localizedDescription

@@ -61,7 +61,7 @@ struct BrowseView: View {
     private func load() async {
         // "recommended" is popularity for now; swap in a real ranking later
         var query = [
-            URLQueryItem(name: "select", value: "*,creator:profiles(display_name,username)"),
+            URLQueryItem(name: "select", value: "*"),
             URLQueryItem(name: "visibility", value: "eq.public"),
             URLQueryItem(name: "order", value: "chat_count.desc"),
             URLQueryItem(name: "limit", value: "60"),
@@ -71,8 +71,9 @@ struct BrowseView: View {
         if gender != .all { query.append(URLQueryItem(name: "gender", value: "eq.\(gender.rawValue)")) }
         if category != .recommended { query.append(URLQueryItem(name: "categories", value: "cs.{\(category.rawValue)}")) }
         if noAiArt { query.append(URLQueryItem(name: "ai_art", value: "eq.false")) }
+        query.append(URLQueryItem(name: "nsfw", value: "eq.false")) // the apps always keep the nsfw filter on (app store rules)
         do {
-            characters = try await Supabase.select("characters", query, token: try await session.validToken())
+            characters = try await Supabase.select("character_cards", query, token: try await session.validToken())
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -109,7 +110,7 @@ struct CharacterCard: View {
                     .overlay(Text(character.name.prefix(1)).font(.system(size: 52, weight: .heavy)).foregroundStyle(Theme.accent))
                     .overlay {
                         if let url = character.avatarUrl {
-                            AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
+                            AsyncImage(url: url) { $0.resizable().scaledToFill().blur(radius: character.nsfwCover == true ? 24 : 0) } placeholder: { Color.clear }
                         }
                     }
                 HStack {
@@ -134,8 +135,8 @@ struct CharacterCard: View {
                 if let tagline = character.tagline {
                     Text(tagline).font(.caption).foregroundStyle(Theme.muted).lineLimit(2)
                 }
-                if let creator = character.creator?.label, !creator.isEmpty {
-                    Text("by \(creator)").font(.caption2).foregroundStyle(Theme.muted)
+                if !character.creatorLabel.isEmpty {
+                    Text("by \(character.creatorLabel)").font(.caption2).foregroundStyle(Theme.muted)
                 }
                 if !character.tags.isEmpty {
                     HStack(spacing: 4) {

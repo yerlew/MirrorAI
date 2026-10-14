@@ -1,8 +1,11 @@
 import Foundation
 
+/// a row of the character_cards view. creator fields are nil for anonymous bots.
 struct Character: Codable, Identifiable, Hashable {
     let id: UUID
-    var creatorId: UUID
+    var creatorId: UUID?
+    var creatorName: String?
+    var creatorUsername: String?
     var name: String
     var tagline: String?
     var avatarUrl: URL?
@@ -16,12 +19,13 @@ struct Character: Codable, Identifiable, Hashable {
     var categories: [String]
     var aiArt: Bool
     var artCredit: String?
-    var creator: Creator?
+    var nsfw: Bool?
+    var nsfwCover: Bool?
+    var anonymous: Bool?
 
-    struct Creator: Codable, Hashable {
-        var displayName: String?
-        var username: String?
-        var label: String { displayName ?? username.map { "@\($0)" } ?? "" }
+    var creatorLabel: String {
+        if anonymous == true { return "anonymous" }
+        return creatorName ?? creatorUsername.map { "@\($0)" } ?? ""
     }
 }
 
@@ -39,6 +43,9 @@ struct NewCharacter: Encodable {
     var categories: [String]
     var aiArt: Bool
     var artCredit: String?
+    var nsfw: Bool
+    var nsfwCover: Bool
+    var anonymous: Bool
 }
 
 struct ChatRef: Codable, Identifiable {
@@ -52,6 +59,7 @@ struct Profile: Codable, Identifiable {
     let id: UUID
     var username: String?
     var displayName: String?
+    var bio: String?
     var label: String { displayName ?? username.map { "@\($0)" } ?? "" }
 }
 
@@ -97,4 +105,26 @@ struct Message: Codable, Identifiable, Equatable {
         role = try c.decode(Role.self, forKey: .role)
         content = try c.decode(String.self, forKey: .content)
     }
+}
+
+struct CreatorProfile: Codable, Identifiable {
+    let id: UUID
+    var username: String?
+    var displayName: String?
+    var bio: String
+    var followerCount: Int
+    var botCount: Int
+    var totalChats: Int
+    var label: String { displayName ?? username.map { "@\($0)" } ?? "" }
+}
+
+/// one row per bot you've chatted with, for the Chats tab
+struct ChatSummary: Codable {
+    var characterId: UUID
+    var updatedAt: String
+}
+
+struct ChatMemory: Codable {
+    var memory: String
+    var pinned: String
 }

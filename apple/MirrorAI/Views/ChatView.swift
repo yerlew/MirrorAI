@@ -11,16 +11,31 @@ struct ChatView: View {
     @State private var personaId: UUID?
     @State private var chattingAs = ""
     @State private var confirmRestart = false
+    @State private var showMemory = false
+    @State private var reported = false
 
     private var starting: Bool { chatId == nil && messages.isEmpty }
 
     var body: some View {
+        if character.nsfw == true {
+            ContentUnavailableView("\(character.name) is 18+", systemImage: "eye.slash",
+                                   description: Text("18+ bots are only available on the website."))
+        } else {
+            chat
+        }
+    }
+
+    private var chat: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         if starting && session.userId != nil {
                             PersonaPicker(character: character, selection: $personaId)
+                        }
+                        if let username = character.creatorUsername, character.anonymous != true {
+                            NavigationLink("by \(character.creatorLabel)") { CreatorView(username: username) }
+                                .font(.caption).foregroundStyle(Theme.accent)
                         }
                         if !character.greeting.isEmpty { Bubble(text: character.greeting, isUser: false) }
                         ForEach(messages) { m in Bubble(text: m.content, isUser: m.role == .user).id(m.id) }
@@ -44,13 +59,25 @@ struct ChatView: View {
         }
         .navigationTitle(character.name)
         .toolbar {
-            if chatId != nil {
-                ToolbarItem {
-                    Button("Restart chat", systemImage: "arrow.counterclockwise") { confirmRestart = true }
-                        .disabled(sending)
+            ToolbarItem {
+                Menu("More", systemImage: "ellipsis.circle") {
+                    if chatId != nil {
+                        Button("Memory", systemImage: "brain") { showMemory = true }
+                        Button("Restart chat", systemImage: "arrow.counterclockwise") { confirmRestart = true }
+                            .disabled(sending)
+                    }
+                    Menu("Report", systemImage: "flag") {
+                        ForEach(Self.reportReasons, id: \.0) { reason in
+                            Button(reason.1) { Task { await report(reason.0) } }
+                        }
+                    }
                 }
             }
         }
+        .sheet(isPresented: $showMemory) {
+            if let chatId { NavigationStack { MemorySheet(chatId: chatId) } }
+        }
+        .alert("Thanks, we got the report.", isPresented: $reported) {}
         .safeAreaInset(edge: .top) {
             if chatId != nil, !chattingAs.isEmpty {
                 Text("chatting as \(chattingAs)").font(.caption).foregroundStyle(Theme.muted)
@@ -86,6 +113,23 @@ struct ChatView: View {
             URLQueryItem(name: "chat_id", value: "eq.\(chat.id.uuidString)"),
             URLQueryItem(name: "order", value: "id"),
         ], token: token)) ?? []
+    }
+
+    static let reportReasons: [(String, String)] = [
+        ("mislabeled_nsfw", "Adult content not marked 18+"),
+        ("minor_sexualized", "Sexualizes a minor"),
+        ("illegal", "Illegal content"),
+        ("harassment", "Harassment or targets a real person"),
+        ("spam", "Spam"),
+        ("other", "Something else"),
+    ]
+
+    private func report(_ reason: String) async {
+        guard let token = try? await session.validToken(), let uid = session.userId else { return }
+        struct Report: Encodable { var reporterId: UUID; var characterId: UUID; var reason: String }
+        struct Ack: Decodable { var id: Int }
+        let _: Ack? = try? await Supabase.insert("reports", Report(reporterId: uid, characterId: character.id, reason: reason), token: token)
+        reported = true
     }
 
     private func profileLabel(token: String) async -> String {

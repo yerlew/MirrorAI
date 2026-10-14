@@ -19,6 +19,8 @@ struct RootView: View {
         TabView {
             NavigationStack { BrowseView() }
                 .tabItem { Label("Explore", systemImage: "sparkles") }
+            NavigationStack { ChatsView() }
+                .tabItem { Label("Chats", systemImage: "bubble.left.and.bubble.right") }
             NavigationStack { CreateCharacterView() }
                 .tabItem { Label("Create", systemImage: "plus.circle") }
             NavigationStack { ProfileView() }

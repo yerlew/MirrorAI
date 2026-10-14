@@ -29,6 +29,8 @@ private struct SignedInProfile: View {
                         #if os(iOS)
                         .textInputAutocapitalization(.never)
                         #endif
+                    TextField("Bio", text: binding.bio.orEmpty, axis: .vertical)
+                        .lineLimit(2...5)
                     Button("Save profile", action: saveProfile)
                     if let status { Text(status).font(.caption).foregroundStyle(Theme.muted) }
                 } header: {
@@ -56,8 +58,16 @@ private struct SignedInProfile: View {
                 Text("Private, only you can see these. Pick one when you start a chat so the bot knows who you are.")
             }
 
+            if let username = profile?.username {
+                Section {
+                    NavigationLink("View your public page") { CreatorView(username: username) }
+                }
+            }
+
             Section {
                 Button("Log out", role: .destructive) { session.signOut() }
+            } footer: {
+                Text("Your chats, personas and memory are private. Bot creators can't see your chats or that you used their bot.")
             }
         }
         .formStyle(.grouped)
@@ -83,9 +93,9 @@ private struct SignedInProfile: View {
         guard let profile else { return }
         Task {
             do {
-                struct Changes: Encodable { var displayName: String?; var username: String? }
+                struct Changes: Encodable { var displayName: String?; var username: String?; var bio: String }
                 let token = try await session.validToken()
-                let changes = Changes(displayName: profile.displayName, username: profile.username?.lowercased().nilIfEmpty)
+                let changes = Changes(displayName: profile.displayName, username: profile.username?.lowercased().nilIfEmpty, bio: profile.bio ?? "")
                 let _: Profile = try await Supabase.update("profiles", [URLQueryItem(name: "id", value: "eq.\(profile.id.uuidString)")], changes, token: token)
                 status = "Saved"
             } catch {
