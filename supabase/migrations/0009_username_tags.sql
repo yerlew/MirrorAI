@@ -1,48 +1,54 @@
 -- usernames: anything goes (case kept, spaces and symbols fine), except '#' and control characters.
--- names don't have to be unique; everyone gets a #tag per name instead, like Yerlew#1.
--- tags count up shortest-first: 1..9, then 01..99, then 001..999, then 0001.., so "1" and "01" are different tags.
+-- names don't have to be unique. instead every account gets a permanent number tag, like a license plate:
+-- one count for the whole site, in signup order, shortest-first: 0..9, then 00..99, then 000..999, and so on.
+-- the very first account is #0. the tag never changes, even when the username does.
 alter table public.profiles drop constraint profiles_username_key;
 alter table public.profiles drop constraint username_format;
 alter table public.profiles add constraint username_format
   check (username is null or (char_length(username) between 1 and 32 and username = btrim(username) and username !~ '[#[:cntrl:]]'));
-alter table public.profiles add column tag_index integer, add column handle text;
-create unique index profiles_name_tag on public.profiles (lower(username), tag_index);
+alter table public.profiles add column tag_index integer, add column tag text, add column handle text;
+create unique index profiles_tag_index on public.profiles (tag_index);
 create unique index profiles_handle on public.profiles (handle);
 
--- nth tag for a name: 1→"1" … 9→"9", 10→"01" … 108→"99", 109→"001" …
+-- nth tag (0-based): 0→"0" … 9→"9", 10→"00" … 109→"99", 110→"000" …
 create function public.tag_for(n integer) returns text language plpgsql immutable as $$
 declare
   len integer := 1;
-  cap bigint := 9;
+  cap bigint := 10;
   k bigint := n;
 begin
-  if n is null or n < 1 then
+  if n is null or n < 0 then
     return null;
   end if;
-  while k > cap loop
+  while k >= cap loop
     k := k - cap;
     len := len + 1;
-    cap := (10::bigint ^ len)::bigint - 1;
+    cap := (10::bigint ^ len)::bigint;
   end loop;
   return lpad(k::text, len, '0');
 end $$;
 
--- tags are only ever handed out here: a new or changed name gets the next free tag for that name
+-- existing accounts get tags in the order they signed up
+with ordered as (select id, row_number() over (order by created_at, id) - 1 as n from public.profiles)
+update public.profiles p set tag_index = o.n from ordered o where o.id = p.id;
+
+-- tags are only ever handed out here, once per account; nobody can pick or change theirs
 create function public.assign_tag() returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if new.username is null then
-    new.tag_index := null;
-  elsif tg_op = 'UPDATE' and lower(old.username) is not distinct from lower(new.username) then
-    new.tag_index := old.tag_index; -- same name (maybe different capitalization) keeps its tag
+  if tg_op = 'INSERT' then
+    perform pg_advisory_xact_lock(hashtext('profile_tags'));
+    select coalesce(max(tag_index), -1) + 1 into new.tag_index from profiles;
   else
-    perform pg_advisory_xact_lock(hashtext(lower(new.username)));
-    select coalesce(max(tag_index), 0) + 1 into new.tag_index from profiles where lower(username) = lower(new.username);
+    new.tag_index := old.tag_index;
   end if;
-  new.handle := case when new.username is null then null else new.username || '#' || tag_for(new.tag_index) end;
+  new.tag := tag_for(new.tag_index);
+  new.handle := case when new.username is null then null else new.username || '#' || new.tag end;
   return new;
 end $$;
 create trigger assign_tag before insert or update on public.profiles
   for each row execute function public.assign_tag();
+update public.profiles set id = id; -- fill tag + handle for existing rows
+alter table public.profiles alter column tag_index set not null;
 
 -- sign-up passes display_name + username in the auth metadata
 create or replace function public.handle_new_user() returns trigger

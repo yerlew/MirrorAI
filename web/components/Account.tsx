@@ -82,7 +82,7 @@ export function Account({ section }: { section: AccountSection }) {
           </label>
           <label className="field">username {profile.handle && <span>· you're <strong style={{ color: "var(--text)" }}>{profile.handle}</strong></span>}
             <input value={profile.username ?? ""} placeholder="pick one" onChange={(e) => { setProfile({ ...profile, username: e.target.value }); setSaved(""); }} maxLength={32} />
-            <span>Anything goes except #. Your #tag is added for you; changing your name gets you a new tag.</span>
+            <span>Anything goes except #. Your #number is permanent, like a license plate: it stays the same if you change your name.</span>
           </label>
           <label className="field">bio
             <textarea rows={3} value={profile.bio ?? ""} maxLength={500} placeholder="shows on your public creator page" onChange={(e) => { setProfile({ ...profile, bio: e.target.value }); setSaved(""); }} />

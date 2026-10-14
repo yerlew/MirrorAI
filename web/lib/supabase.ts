@@ -12,7 +12,7 @@ export type Character = {
   creator_id: string | null;
   creator_name: string | null;
   creator_username: string | null;
-  creator_handle: string | null; // username#tag, e.g. Yerlew#1
+  creator_handle: string | null; // username#tag, e.g. Yerlew#0
   name: string;
   tagline: string | null;
   avatar_url: string | null;
@@ -44,6 +44,7 @@ export type Character = {
 export type Profile = {
   id: string;
   username: string | null;
+  tag: string; // permanent number tag, handed out in signup order: 0..9, 00..99, 000..
   handle: string | null; // username#tag, unique
   display_name: string | null;
   avatar_url: string | null;

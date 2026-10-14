@@ -53,8 +53,8 @@ export default function SignUp() {
           <input value={f.username} onChange={set("username")} placeholder="anything you want" required maxLength={32} autoComplete="username" />
           <span>
             {f.username.trim() && !usernameProblem(f.username)
-              ? <>you&apos;ll be <strong style={{ color: "var(--text)" }}>{f.username.trim()}#</strong>tag. the tag is added for you, like {f.username.trim()}#1</>
-              : "No rules except no #. Everyone gets a #tag on the end, like Yerlew#1, so names don't have to be unique."}
+              ? <>you&apos;ll be <strong style={{ color: "var(--text)" }}>{f.username.trim()}#</strong>number. the number is yours for good, handed out in signup order</>
+              : "No rules except no #. Everyone gets a permanent #number on the end, like Yerlew#0, so names don't have to be unique."}
           </span>
         </label>
         <label className="field">password
