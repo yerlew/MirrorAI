@@ -22,11 +22,12 @@ All three clients talk to one Supabase project. They read characters, chats and 
    supabase init          # once; keeps the existing migrations
    supabase link --project-ref YOUR-PROJECT-REF
    supabase db push
-   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-   supabase secrets set OPENROUTER_API_KEY=sk-or-...   # only needed for 18+ bots
+   supabase secrets set OPENROUTER_API_KEY=sk-or-...
    supabase functions deploy chat
+   supabase functions deploy feedback
    ```
-3. Optional: `supabase secrets set CHAT_MODEL=...` to change the model for normal bots (default `claude-opus-5-5`), and `NSFW_MODEL=...` for 18+ bots (any OpenRouter model id).
+3. Optional: `supabase secrets set SFW_MODEL=...` / `NSFW_MODEL=...` to pick the OpenRouter model for normal and 18+ bots (defaults `deepseek/deepseek-chat` and `sao10k/l3.3-euryale-70b`). Setting `ANTHROPIC_API_KEY` moves normal bots onto Claude (`CHAT_MODEL`, default `claude-opus-5-5`); 18+ bots always stay on OpenRouter.
+   For feedback emails: `RESEND_API_KEY` and `FEEDBACK_EMAIL`.
    Re-run `supabase db push` and `supabase functions deploy chat` whenever you pull new changes.
 4. For quick testing, turn off "Confirm email" under Authentication → Providers → Email.
 
