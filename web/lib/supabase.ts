@@ -17,6 +17,10 @@ export type Character = {
   tags: string[];
   visibility: "public" | "unlisted" | "private";
   chat_count: number;
+  gender: "male" | "female" | "nonbinary" | null;
+  categories: string[];
+  ai_art: boolean;
+  art_credit: string | null;
 };
 
 export type Message = { id: number | string; role: "user" | "assistant"; content: string };

@@ -102,8 +102,8 @@ struct Bubble: View {
                 .textSelection(.enabled)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .background(isUser ? AnyShapeStyle(.tint.opacity(0.25)) : AnyShapeStyle(.background.secondary),
-                            in: RoundedRectangle(cornerRadius: 18))
+                .foregroundStyle(isUser ? Color.white : Color.primary)
+                .background(isUser ? Theme.accent : Theme.surface, in: RoundedRectangle(cornerRadius: 18))
             if !isUser { Spacer(minLength: 40) }
         }
     }

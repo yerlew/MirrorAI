@@ -12,6 +12,10 @@ struct Character: Codable, Identifiable, Hashable {
     var tags: [String]
     var visibility: String
     var chatCount: Int
+    var gender: String?
+    var categories: [String]
+    var aiArt: Bool
+    var artCredit: String?
 }
 
 struct NewCharacter: Encodable {
@@ -24,6 +28,10 @@ struct NewCharacter: Encodable {
     var scenario: String
     var tags: [String]
     var visibility: String
+    var gender: String?
+    var categories: [String]
+    var aiArt: Bool
+    var artCredit: String?
 }
 
 struct ChatRef: Codable, Identifiable {

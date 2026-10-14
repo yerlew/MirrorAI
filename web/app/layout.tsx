@@ -9,7 +9,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <header>
-          <Link href="/" className="brand">Mirror AI</Link>
+          <Link href="/" className="brand">Mirror<span>AI</span></Link>
           <nav>
             <Link href="/create">create</Link>
             <Link href="/login">account</Link>

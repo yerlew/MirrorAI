@@ -8,6 +8,7 @@ struct MirrorAIApp: App {
         WindowGroup {
             RootView()
                 .environment(session)
+                .mirrorTheme()
                 .task { await session.restore() }
         }
     }
