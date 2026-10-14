@@ -20,12 +20,13 @@ enum ChatEvent: Decodable {
 }
 
 /// posts to the chat edge function and yields its server-sent events as they arrive
-func streamChat(characterId: UUID, chatId: UUID?, content: String, token: String) -> AsyncThrowingStream<ChatEvent, Error> {
+/// personaId only matters when starting a new chat (chatId nil)
+func streamChat(characterId: UUID, chatId: UUID?, personaId: UUID?, content: String, token: String) -> AsyncThrowingStream<ChatEvent, Error> {
     AsyncThrowingStream { continuation in
         let task = Task {
             do {
                 var body: [String: String] = ["character_id": characterId.uuidString, "content": content]
-                if let chatId { body["chat_id"] = chatId.uuidString }
+                if let chatId { body["chat_id"] = chatId.uuidString } else if let personaId { body["persona_id"] = personaId.uuidString }
                 let req = Supabase.request("functions/v1/chat", method: "POST", body: try JSONEncoder().encode(body), token: token)
                 let (bytes, res) = try await URLSession.shared.bytes(for: req)
                 guard (res as? HTTPURLResponse)?.statusCode == 200 else {

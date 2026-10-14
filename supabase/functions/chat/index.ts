@@ -1,5 +1,6 @@
 // POST /functions/v1/chat
-// body: { character_id: string, chat_id?: string, content: string }
+// body: { character_id: string, chat_id?: string, persona_id?: string, content: string }
+// persona_id only counts when starting a chat (no chat_id); after that the chat keeps its persona.
 // streams server-sent events: {type:"chat",chat_id} → {type:"delta",text}* → {type:"done"} | {type:"error",message}
 import Anthropic from "npm:@anthropic-ai/sdk@0.133";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -18,12 +19,28 @@ const cors = {
 
 type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string };
 type Row = { id: number; role: "user" | "assistant"; content: string };
+type User = { name: string; backstory: string }; // who the bot is talking to
 
-function systemPrompt(c: Character, memory: string) {
+async function loadUser(userId: string, personaId: string | null, characterId: string): Promise<User> {
+  if (personaId) {
+    const [{ data: persona }, { data: override }] = await Promise.all([
+      admin.from("personas").select("name, backstory").eq("id", personaId).eq("user_id", userId).maybeSingle(),
+      admin.from("persona_overrides").select("extra_backstory").eq("persona_id", personaId).eq("character_id", characterId).maybeSingle(),
+    ]);
+    if (persona) {
+      return { name: persona.name, backstory: [persona.backstory, override?.extra_backstory].filter(Boolean).join("\n\n") };
+    }
+  }
+  const { data: profile } = await admin.from("profiles").select("display_name, username").eq("id", userId).maybeSingle();
+  return { name: profile?.display_name || profile?.username || "", backstory: "" };
+}
+
+function systemPrompt(c: Character, user: User, memory: string) {
   return [
     `You are ${c.name}, a character in an interactive roleplay chat. Stay in character for the whole conversation; never mention being an AI model unless the user steps out of the story and asks directly.`,
     `<persona>\n${c.persona}\n</persona>`,
     c.scenario && `<scenario>\n${c.scenario}\n</scenario>`,
+    user.name && `You are talking with ${user.name}.${user.backstory ? ` What you know about them:\n<user_persona>\n${user.backstory}\n</user_persona>` : ""}`,
     c.greeting && `You opened the conversation with this line:\n<greeting>\n${c.greeting}\n</greeting>`,
     memory && `What has happened so far in earlier parts of this chat:\n<memory>\n${memory}\n</memory>`,
     "Write natural replies in your own voice, matching the user's energy and length. Use *asterisks* for actions. Move the story forward; don't repeat yourself.",
@@ -69,19 +86,27 @@ Deno.serve(async (req) => {
     return new Response("character not found", { status: 404, headers: cors });
   }
 
-  let chat: { id: string; memory: string; memory_through: number } | null = null;
+  type Chat = { id: string; memory: string; memory_through: number; persona_id: string | null };
+  let chat: Chat | null = null;
   if (body.chat_id) {
-    const { data } = await admin.from("chats").select("id, memory, memory_through")
+    const { data } = await admin.from("chats").select("id, memory, memory_through, persona_id")
       .eq("id", body.chat_id).eq("user_id", userId).eq("character_id", character.id).single();
     chat = data;
     if (!chat) return new Response("chat not found", { status: 404, headers: cors });
   } else {
-    const { data, error } = await admin.from("chats").insert({ user_id: userId, character_id: character.id })
-      .select("id, memory, memory_through").single();
+    let personaId: string | null = null;
+    if (typeof body.persona_id === "string") {
+      const { data: persona } = await admin.from("personas").select("id").eq("id", body.persona_id).eq("user_id", userId).maybeSingle();
+      if (!persona) return new Response("persona not found", { status: 404, headers: cors });
+      personaId = persona.id;
+    }
+    const { data, error } = await admin.from("chats").insert({ user_id: userId, character_id: character.id, persona_id: personaId })
+      .select("id, memory, memory_through, persona_id").single();
     if (error) return new Response(error.message, { status: 500, headers: cors });
     chat = data;
   }
 
+  const user = await loadUser(userId, chat.persona_id, character.id);
   await admin.from("messages").insert({ chat_id: chat.id, role: "user", content });
   const { data: recent } = await admin.from("messages").select("id, role, content")
     .eq("chat_id", chat.id).gt("id", chat.memory_through).order("id", { ascending: false }).limit(WINDOW);
@@ -103,7 +128,7 @@ Deno.serve(async (req) => {
           betas: ["server-side-fallback-2026-07-01"],
           // deno-lint-ignore no-explicit-any
           fallbacks: "default" as any, // on a policy decline the api retries on a fallback model
-          system: systemPrompt(character, chat!.memory),
+          system: systemPrompt(character, user, chat!.memory),
           messages: history.map((m) => ({ role: m.role, content: m.content })),
         });
         for await (const ev of s) {

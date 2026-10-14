@@ -55,10 +55,23 @@ enum Supabase {
         try await send(request("rest/v1/\(table)", query: query, token: token))
     }
 
-    static func insert<T: Decodable>(_ table: String, _ row: some Encodable, token: String?) async throws -> T {
+    static func insert<T: Decodable>(_ table: String, _ row: some Encodable, token: String?, upsert: Bool = false) async throws -> T {
+        let prefer = upsert ? "return=representation,resolution=merge-duplicates" : "return=representation"
         let req = request("rest/v1/\(table)", method: "POST", body: try encoder.encode(row), token: token,
+                          extraHeaders: ["Prefer": prefer, "Accept": "application/vnd.pgrst.object+json"])
+        return try await send(req)
+    }
+
+    /// PATCH rows matching `query`, returning the first updated row
+    static func update<T: Decodable>(_ table: String, _ query: [URLQueryItem], _ changes: some Encodable, token: String?) async throws -> T {
+        let req = request("rest/v1/\(table)", method: "PATCH", query: query, body: try encoder.encode(changes), token: token,
                           extraHeaders: ["Prefer": "return=representation", "Accept": "application/vnd.pgrst.object+json"])
         return try await send(req)
+    }
+
+    static func delete(_ table: String, _ query: [URLQueryItem], token: String?) async throws {
+        let (_, res) = try await URLSession.shared.data(for: request("rest/v1/\(table)", method: "DELETE", query: query, token: token))
+        guard let http = res as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw APIError(message: "delete failed") }
     }
 }
 

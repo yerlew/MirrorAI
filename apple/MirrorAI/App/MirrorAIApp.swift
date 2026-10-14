@@ -21,8 +21,8 @@ struct RootView: View {
                 .tabItem { Label("Explore", systemImage: "sparkles") }
             NavigationStack { CreateCharacterView() }
                 .tabItem { Label("Create", systemImage: "plus.circle") }
-            NavigationStack { AccountView() }
-                .tabItem { Label("Account", systemImage: "person.crop.circle") }
+            NavigationStack { ProfileView() }
+                .tabItem { Label("Profile", systemImage: "person.crop.circle") }
         }
     }
 }

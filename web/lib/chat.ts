@@ -7,12 +7,13 @@ export type ChatEvent =
   | { type: "error"; message: string };
 
 // posts a message to the chat edge function and yields its server-sent events
-export async function* sendMessage(characterId: string, chatId: string | null, content: string): AsyncGenerator<ChatEvent> {
+// personaId only matters when starting a new chat (chatId null)
+export async function* sendMessage(characterId: string, chatId: string | null, content: string, personaId: string | null = null): AsyncGenerator<ChatEvent> {
   const { data } = await supabase.auth.getSession();
   const res = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token ?? ""}` },
-    body: JSON.stringify({ character_id: characterId, chat_id: chatId, content }),
+    body: JSON.stringify({ character_id: characterId, chat_id: chatId, persona_id: chatId ? null : personaId, content }),
   });
   if (!res.ok || !res.body) {
     yield { type: "error", message: res.status === 401 ? "log in first" : `request failed (${res.status})` };

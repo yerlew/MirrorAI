@@ -18,7 +18,8 @@ export default function Login() {
       ? await supabase.auth.signInWithPassword({ email, password })
       : await supabase.auth.signUp({ email, password });
     if (error) setError(error.message);
-    else setUser(data.user?.email ?? null);
+    else if (data.session) location.href = "/profile";
+    else setError("check your email to confirm, then log in");
   }
 
   if (user) {

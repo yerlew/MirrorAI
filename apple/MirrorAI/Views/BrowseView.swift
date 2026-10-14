@@ -61,7 +61,7 @@ struct BrowseView: View {
     private func load() async {
         // "recommended" is popularity for now; swap in a real ranking later
         var query = [
-            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "select", value: "*,creator:profiles(display_name,username)"),
             URLQueryItem(name: "visibility", value: "eq.public"),
             URLQueryItem(name: "order", value: "chat_count.desc"),
             URLQueryItem(name: "limit", value: "60"),
@@ -133,6 +133,9 @@ struct CharacterCard: View {
                 Text(character.name).font(.headline).lineLimit(1)
                 if let tagline = character.tagline {
                     Text(tagline).font(.caption).foregroundStyle(Theme.muted).lineLimit(2)
+                }
+                if let creator = character.creator?.label, !creator.isEmpty {
+                    Text("by \(creator)").font(.caption2).foregroundStyle(Theme.muted)
                 }
                 if !character.tags.isEmpty {
                     HStack(spacing: 4) {

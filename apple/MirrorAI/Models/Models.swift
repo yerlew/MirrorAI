@@ -16,6 +16,13 @@ struct Character: Codable, Identifiable, Hashable {
     var categories: [String]
     var aiArt: Bool
     var artCredit: String?
+    var creator: Creator?
+
+    struct Creator: Codable, Hashable {
+        var displayName: String?
+        var username: String?
+        var label: String { displayName ?? username.map { "@\($0)" } ?? "" }
+    }
 }
 
 struct NewCharacter: Encodable {
@@ -36,6 +43,38 @@ struct NewCharacter: Encodable {
 
 struct ChatRef: Codable, Identifiable {
     let id: UUID
+    var persona: PersonaName?
+    struct PersonaName: Codable { var name: String }
+}
+
+/// public identity: shown on comments and on the bots you post
+struct Profile: Codable, Identifiable {
+    let id: UUID
+    var username: String?
+    var displayName: String?
+    var label: String { displayName ?? username.map { "@\($0)" } ?? "" }
+}
+
+/// private "who i am in this chat" profile, only readable by its owner
+struct Persona: Codable, Identifiable, Hashable {
+    let id: UUID
+    var userId: UUID
+    var name: String
+    var backstory: String
+}
+
+struct PersonaDraft: Encodable {
+    var userId: UUID
+    var name: String
+    var backstory: String
+}
+
+/// extra backstory a persona has with one bot only
+struct PersonaOverride: Codable {
+    var personaId: UUID
+    var characterId: UUID
+    var userId: UUID
+    var extraBackstory: String
 }
 
 struct Message: Codable, Identifiable, Equatable {

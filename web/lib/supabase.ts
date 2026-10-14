@@ -21,6 +21,17 @@ export type Character = {
   categories: string[];
   ai_art: boolean;
   art_credit: string | null;
+  creator?: { display_name: string | null; username: string | null } | null;
 };
+
+// public identity: shown on comments and on the bots you post
+export type Profile = { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
+
+// private, only ever readable by their owner
+export type Persona = { id: string; user_id: string; name: string; backstory: string; avatar_url: string | null };
+
+export function profileName(p?: { display_name: string | null; username: string | null } | null) {
+  return p?.display_name || (p?.username ? `@${p.username}` : "");
+}
 
 export type Message = { id: number | string; role: "user" | "assistant"; content: string };
