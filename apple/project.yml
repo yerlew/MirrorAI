@@ -1,0 +1,31 @@
+# generate the xcode project with: brew install xcodegen && xcodegen
+name: MirrorAI
+options:
+  bundleIdPrefix: com.yerlew
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+configFiles:
+  Debug: MirrorAI/Config.xcconfig
+  Release: MirrorAI/Config.xcconfig
+targets:
+  MirrorAI:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources: [MirrorAI]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yerlew.mirrorai
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Mirror AI
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_OUTGOING_NETWORK_CONNECTIONS: YES
+        SWIFT_VERSION: "5.10"
+    info:
+      path: MirrorAI/Info.plist
+      properties:
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)

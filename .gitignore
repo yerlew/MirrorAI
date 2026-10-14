@@ -8,3 +8,4 @@ xcuserdata/
 DerivedData/
 apple/MirrorAI/Config.xcconfig
 supabase/.temp/
+next-env.d.ts
