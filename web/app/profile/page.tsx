@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { type Persona, type Profile, supabase } from "@/lib/supabase";
+import { CONTENT_FILTERS, type ContentFilter, confirmAdult, type Persona, type Profile, supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
@@ -36,16 +36,13 @@ export default function ProfilePage() {
     else setSaved("saved");
   }
 
-  async function setNsfw(show: boolean) {
+  async function setFilter(f: ContentFilter) {
     if (!profile) return;
-    let adult = profile.adult_confirmed_at;
-    if (show && !adult) {
-      if (!confirm("18+ content. confirm you're at least 18 years old.")) return;
-      adult = new Date().toISOString();
-    }
-    const { error } = await supabase.from("profiles").update({ show_nsfw: show, adult_confirmed_at: adult }).eq("id", profile.id);
+    if (f !== "sfw" && !(await confirmAdult(profile))) return;
+    const adult = profile.adult_confirmed_at ?? (f !== "sfw" ? new Date().toISOString() : null);
+    const { error } = await supabase.from("profiles").update({ content_filter: f }).eq("id", profile.id);
     if (error) return setError(error.message);
-    setProfile({ ...profile, show_nsfw: show, adult_confirmed_at: adult });
+    setProfile({ ...profile, content_filter: f, adult_confirmed_at: adult });
   }
 
   async function savePersona(e: React.FormEvent) {
@@ -97,12 +94,21 @@ export default function ProfilePage() {
 
       {profile && (
         <section className="panel">
-          <h2>Content</h2>
-          <label className="switch" style={{ marginLeft: 0 }}>
-            <input type="checkbox" role="switch" checked={!profile.show_nsfw} onChange={(e) => setNsfw(!e.target.checked)} />
-            NSFW filter {profile.show_nsfw ? "off: 18+ bots and covers show unfiltered" : "on: 18+ bots are hidden and 18+ covers are blurred"}
-          </label>
-          <p className="muted" style={{ margin: 0 }}>The website only. The iPhone and Mac apps always keep the filter on.</p>
+          <h2>Settings</h2>
+          <div className="row">
+            <span>NSFW filter</span>
+            <div className="segmented" role="group" aria-label="NSFW filter">
+              {CONTENT_FILTERS.map((f) => (
+                <button key={f.key} type="button" aria-pressed={profile.content_filter === f.key} onClick={() => setFilter(f.key)}>{f.label}</button>
+              ))}
+            </div>
+          </div>
+          <p className="muted" style={{ margin: 0 }}>
+            {profile.content_filter === "sfw" && "Non-NSFW: 18+ bots are hidden and 18+ covers are blurred."}
+            {profile.content_filter === "any" && "Any: everything shows, unfiltered."}
+            {profile.content_filter === "nsfw" && "NSFW: only 18+ bots show."}
+            {" "}This is your default; you can switch it for a single search on Discover.
+          </p>
         </section>
       )}
 

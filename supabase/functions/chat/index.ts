@@ -118,8 +118,8 @@ Deno.serve(async (req) => {
     return new Response("character not found", { status: 404, headers: cors });
   }
   if (character.nsfw) {
-    const { data: me } = await admin.from("profiles").select("show_nsfw").eq("id", userId).single();
-    if (!me?.show_nsfw) return new Response("this bot is 18+ and your nsfw filter is on", { status: 403, headers: cors });
+    const { data: me } = await admin.from("profiles").select("adult_confirmed_at").eq("id", userId).single();
+    if (!me?.adult_confirmed_at) return new Response("this bot is 18+. confirm your age first.", { status: 403, headers: cors });
   }
 
   type Chat = { id: string; memory: string; pinned: string; memory_through: number; persona_id: string | null };

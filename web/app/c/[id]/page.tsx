@@ -6,7 +6,7 @@ import { CHATS_CHANGED } from "@/components/ChatList";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { PersonaPicker } from "@/components/PersonaPicker";
 import { sendMessage } from "@/lib/chat";
-import { type Character, creatorName, type Message, profileName, supabase } from "@/lib/supabase";
+import { type Character, confirmAdult, creatorName, type Message, myProfile, profileName, supabase } from "@/lib/supabase";
 import { download, exportChat } from "@/lib/transfer";
 
 const REPORT_REASONS = [
@@ -30,7 +30,7 @@ export default function Chat() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [showNsfw, setShowNsfw] = useState(false);
+  const [adult, setAdult] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
@@ -42,9 +42,9 @@ export default function Chat() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) return;
       setLoggedIn(true);
-      const { data: me } = await supabase.from("profiles").select("display_name, username, show_nsfw").eq("id", auth.user.id).single();
+      const { data: me } = await supabase.from("profiles").select("display_name, username, adult_confirmed_at").eq("id", auth.user.id).single();
       setProfileLabel(profileName(me));
-      setShowNsfw(me?.show_nsfw ?? false);
+      setAdult(!!me?.adult_confirmed_at);
       // resume the most recent chat with this character, if any
       const { data: chat } = await supabase.from("chats").select("id, persona:personas(name)").eq("character_id", id)
         .order("updated_at", { ascending: false }).limit(1).maybeSingle<{ id: string; persona: { name: string } | null }>();
@@ -110,12 +110,13 @@ export default function Chat() {
   }
 
   if (!character) return <main className="muted">loading…</main>;
-  if (character.nsfw && !showNsfw) {
+  if (character.nsfw && !adult) {
     return (
       <main style={{ maxWidth: 520 }}>
         <div className="panel">
           <h2>{character.name} is marked 18+</h2>
-          <p className="muted" style={{ margin: 0 }}>Your NSFW filter is on. You can turn it off on your <Link href="/profile" style={{ color: "var(--accent)" }}>profile</Link> if you're an adult.</p>
+          <p className="muted" style={{ margin: 0 }}>Confirm you're an adult to open this bot.</p>
+          <div className="row"><button onClick={async () => setAdult(await confirmAdult(await myProfile()))}>I'm 18 or older</button></div>
         </div>
       </main>
     );

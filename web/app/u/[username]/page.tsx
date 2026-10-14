@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { type Character, compact, type CreatorProfile, myProfile, profileName, supabase } from "@/lib/supabase";
+import { applyContentFilter, blurCover, type Character, compact, type ContentFilter, type CreatorProfile, myProfile, profileName, supabase } from "@/lib/supabase";
 
 export default function CreatorPage() {
   const { username } = useParams<{ username: string }>();
@@ -10,7 +10,7 @@ export default function CreatorPage() {
   const [bots, setBots] = useState<Character[]>([]);
   const [me, setMe] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
-  const [showNsfw, setShowNsfw] = useState(false);
+  const [filter, setFilter] = useState<ContentFilter>("sfw");
 
   useEffect(() => {
     (async () => {
@@ -19,9 +19,9 @@ export default function CreatorPage() {
       if (!c) return;
       const profile = await myProfile();
       setMe(profile?.id ?? null);
-      setShowNsfw(profile?.show_nsfw ?? false);
+      setFilter(profile?.content_filter ?? "sfw");
       let q = supabase.from("character_cards").select("*").eq("creator_id", c.id).eq("visibility", "public").order("chat_count", { ascending: false });
-      if (!profile?.show_nsfw) q = q.eq("nsfw", false);
+      q = applyContentFilter(q, profile?.content_filter ?? "sfw");
       const { data: b } = await q;
       setBots((b as Character[]) ?? []);
       if (profile) {
@@ -67,7 +67,7 @@ export default function CreatorPage() {
           <Link key={c.id} href={`/c/${c.id}`} className="card">
             <div className="art">
               {c.name[0]}
-              {c.avatar_url && <img src={c.avatar_url} alt="" className={c.nsfw_cover && !showNsfw ? "blur" : undefined} />}
+              {c.avatar_url && <img src={c.avatar_url} alt="" className={blurCover(c, filter) ? "blur" : undefined} />}
               <span className="count">💬 {compact(c.chat_count)}</span>
             </div>
             <div className="body">

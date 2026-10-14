@@ -36,9 +36,38 @@ export type Profile = {
   display_name: string | null;
   avatar_url: string | null;
   bio: string;
-  show_nsfw: boolean;
+  content_filter: ContentFilter;
   adult_confirmed_at: string | null;
 };
+
+/** what shows up while browsing: non-nsfw only, everything, or nsfw only */
+export type ContentFilter = "sfw" | "any" | "nsfw";
+export const CONTENT_FILTERS: { key: ContentFilter; label: string }[] = [
+  { key: "sfw", label: "Non-NSFW" },
+  { key: "any", label: "Any" },
+  { key: "nsfw", label: "NSFW" },
+];
+
+// works on any postgrest select over character_cards
+export function applyContentFilter<Q extends { eq(column: string, value: boolean): Q }>(query: Q, filter: ContentFilter): Q {
+  if (filter === "sfw") return query.eq("nsfw", false);
+  if (filter === "nsfw") return query.eq("nsfw", true);
+  return query;
+}
+
+/** 18+ covers get blurred unless you're browsing with nsfw allowed */
+export function blurCover(c: Character, filter: ContentFilter) {
+  return c.nsfw_cover && filter === "sfw";
+}
+
+/** records the self-declared 18+ confirmation. returns false if they backed out or aren't logged in. */
+export async function confirmAdult(profile: Profile | null): Promise<boolean> {
+  if (profile?.adult_confirmed_at) return true;
+  if (!confirm("18+ content. confirm you're at least 18 years old.")) return false;
+  if (!profile) return true; // logged out: allowed for this visit only
+  const { error } = await supabase.from("profiles").update({ adult_confirmed_at: new Date().toISOString() }).eq("id", profile.id);
+  return !error;
+}
 
 export type CreatorProfile = {
   id: string;
