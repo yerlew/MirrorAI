@@ -13,6 +13,7 @@ export default function Create() {
   const [aiArt, setAiArt] = useState(false);
   const [nsfw, setNsfw] = useState(false);
   const [nsfwCover, setNsfwCover] = useState(false);
+  const [minor, setMinor] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,8 +33,9 @@ export default function Create() {
       gender: f.gender || null,
       categories,
       ai_art: aiArt,
-      nsfw,
-      nsfw_cover: nsfw || nsfwCover,
+      minor,
+      nsfw: !minor && nsfw,
+      nsfw_cover: !minor && (nsfw || nsfwCover),
       anonymous,
       tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean),
       creator_id: auth.user.id,
@@ -71,10 +73,16 @@ export default function Create() {
         <textarea rows={3} placeholder="greeting: their first message" value={f.greeting} onChange={set("greeting")} />
         <input placeholder="extra tags, comma separated" value={f.tags} onChange={set("tags")} />
         <label className="switch" style={{ marginLeft: 0 }}>
-          <input type="checkbox" role="switch" checked={nsfw} onChange={(e) => setNsfw(e.target.checked)} />
-          this bot is 18+ (hidden from anyone with the NSFW filter on)
+          <input type="checkbox" role="switch" checked={minor} onChange={(e) => setMinor(e.target.checked)} />
+          this character is under 18 (locks the bot to non-NSFW for good)
         </label>
-        {!nsfw && (
+        {!minor && (
+          <label className="switch" style={{ marginLeft: 0 }}>
+            <input type="checkbox" role="switch" checked={nsfw} onChange={(e) => setNsfw(e.target.checked)} />
+            this bot is 18+ (hidden from anyone with the NSFW filter on)
+          </label>
+        )}
+        {!minor && !nsfw && (
           <label className="switch" style={{ marginLeft: 0 }}>
             <input type="checkbox" role="switch" checked={nsfwCover} onChange={(e) => setNsfwCover(e.target.checked)} />
             the cover image is 18+ (blurred for anyone with the filter on)

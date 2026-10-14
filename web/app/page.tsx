@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CATEGORIES, type Category, GENDERS, type Gender } from "@/lib/discovery";
 import {
-  applyContentFilter, blurCover, type Character, compact, CONTENT_FILTERS, type ContentFilter, confirmAdult, creatorName, myProfile,
-  type Profile, supabase,
+  applyContentFilter, blurCover, type Character, compact, CONTENT_FILTERS, type ContentFilter, creatorName, myProfile,
+  supabase,
 } from "@/lib/supabase";
 
 const NO_AI_ART_KEY = "mirror.noAiArt";
@@ -15,13 +15,12 @@ export default function ForYou() {
   const [gender, setGender] = useState<Gender>("all");
   const [category, setCategory] = useState<Category>("recommended");
   const [noAiArt, setNoAiArt] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
   // starts at your profile setting; changing it here only applies to this search
   const [filter, setFilter] = useState<ContentFilter | null>(null); // null until we know
 
   useEffect(() => {
     try { setNoAiArt(localStorage.getItem(NO_AI_ART_KEY) === "1"); } catch {}
-    myProfile().then((p) => { setProfile(p); setFilter(p?.content_filter ?? "sfw"); });
+    myProfile().then((p) => setFilter(p?.content_filter ?? "sfw"));
   }, []);
 
   function toggleAiArt(on: boolean) {
@@ -41,11 +40,6 @@ export default function ForYou() {
     query.then(({ data }) => setChars((data as Character[]) ?? []));
   }, [q, gender, category, noAiArt, filter]);
 
-  async function pickFilter(f: ContentFilter) {
-    if (f !== "sfw" && !(await confirmAdult(profile))) return;
-    if (profile && !profile.adult_confirmed_at) setProfile({ ...profile, adult_confirmed_at: new Date().toISOString() });
-    setFilter(f);
-  }
 
   return (
     <main>
@@ -60,7 +54,7 @@ export default function ForYou() {
         </div>
         <div className="segmented" role="group" aria-label="Content filter for this search" title="Applies to this search. Set your default in profile.">
           {CONTENT_FILTERS.map((f) => (
-            <button key={f.key} aria-pressed={filter === f.key} onClick={() => pickFilter(f.key)}>{f.label}</button>
+            <button key={f.key} aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>{f.label}</button>
           ))}
         </div>
         <label className="switch" title="Only show characters with human-made art">

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CONTENT_FILTERS, type ContentFilter, confirmAdult, type Persona, type Profile, supabase } from "@/lib/supabase";
+import { CONTENT_FILTERS, type ContentFilter, type Persona, type Profile, supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
@@ -38,11 +38,9 @@ export default function ProfilePage() {
 
   async function setFilter(f: ContentFilter) {
     if (!profile) return;
-    if (f !== "sfw" && !(await confirmAdult(profile))) return;
-    const adult = profile.adult_confirmed_at ?? (f !== "sfw" ? new Date().toISOString() : null);
     const { error } = await supabase.from("profiles").update({ content_filter: f }).eq("id", profile.id);
     if (error) return setError(error.message);
-    setProfile({ ...profile, content_filter: f, adult_confirmed_at: adult });
+    setProfile({ ...profile, content_filter: f });
   }
 
   async function savePersona(e: React.FormEvent) {

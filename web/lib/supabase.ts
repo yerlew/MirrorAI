@@ -26,6 +26,7 @@ export type Character = {
   art_credit: string | null;
   nsfw: boolean;
   nsfw_cover: boolean;
+  minor: boolean; // character is under 18: always non-nsfw, can't be changed
   anonymous: boolean;
 };
 
@@ -60,14 +61,6 @@ export function blurCover(c: Character, filter: ContentFilter) {
   return c.nsfw_cover && filter === "sfw";
 }
 
-/** records the self-declared 18+ confirmation. returns false if they backed out or aren't logged in. */
-export async function confirmAdult(profile: Profile | null): Promise<boolean> {
-  if (profile?.adult_confirmed_at) return true;
-  if (!confirm("18+ content. confirm you're at least 18 years old.")) return false;
-  if (!profile) return true; // logged out: allowed for this visit only
-  const { error } = await supabase.from("profiles").update({ adult_confirmed_at: new Date().toISOString() }).eq("id", profile.id);
-  return !error;
-}
 
 export type CreatorProfile = {
   id: string;
