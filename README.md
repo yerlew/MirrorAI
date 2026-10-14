@@ -10,7 +10,7 @@ supabase/   Postgres schema + the `chat` edge function that talks to Claude
 
 ## How it fits together
 
-All three clients talk to one Supabase project. They read characters, chats and messages straight from Postgres (row-level security keeps people in their own chats). Sending a message goes through the `chat` edge function, which holds the Claude API key, builds the prompt from the character's persona plus the chat's long-term memory, streams the reply back, and saves it. Every 20 messages past the last 40, it folds the older ones into a running memory summary, so long chats don't forget.
+All three clients talk to one Supabase project. They read characters, chats and messages straight from Postgres (row-level security keeps people in their own chats). Sending a message goes through the `chat` edge function, which holds the Claude API key, builds the prompt from the character's persona plus the chat's long-term memory, streams the reply back, and saves it. The last 80-120 messages always go in word for word; older ones get folded into a running memory summary, plus facts you pin yourself, so long chats don't forget. 18+ bots run on an OpenRouter model instead of Claude.
 
 ## Setup
 
@@ -23,9 +23,11 @@ All three clients talk to one Supabase project. They read characters, chats and 
    supabase link --project-ref YOUR-PROJECT-REF
    supabase db push
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   supabase secrets set OPENROUTER_API_KEY=sk-or-...   # only needed for 18+ bots
    supabase functions deploy chat
    ```
-3. Optional: `supabase secrets set CHAT_MODEL=...` to change the model (default `claude-opus-5-5`).
+3. Optional: `supabase secrets set CHAT_MODEL=...` to change the model for normal bots (default `claude-opus-5-5`), and `NSFW_MODEL=...` for 18+ bots (any OpenRouter model id).
+   Re-run `supabase db push` and `supabase functions deploy chat` whenever you pull new changes.
 4. For quick testing, turn off "Confirm email" under Authentication → Providers → Email.
 
 ### 2. Apple app (Xcode)
@@ -46,5 +48,5 @@ Pick the "My Mac" or an iPhone simulator destination and run. The `.xcodeproj` i
 cd web
 cp .env.example .env.local   # fill in URL + anon key
 npm install
-npm run dev
+npm run dev                  # then open http://localhost:3000
 ```
