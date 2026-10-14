@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -12,14 +13,11 @@ export default function Login() {
     supabase.auth.getUser().then(({ data }) => setUser(data.user?.email ?? null));
   }, []);
 
-  async function submit(kind: "in" | "up") {
+  async function submit() {
     setError("");
-    const { data, error } = kind === "in"
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
-    else if (data.session) location.href = "/profile";
-    else setError("check your email to confirm, then log in");
+    else location.href = "/profile";
   }
 
   if (user) {
@@ -33,12 +31,12 @@ export default function Login() {
 
   return (
     <main>
-      <form className="stack" onSubmit={(e) => { e.preventDefault(); submit("in"); }}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <input type="email" placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input type="password" placeholder="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
         <div style={{ display: "flex", gap: 8 }}>
           <button type="submit">log in</button>
-          <button type="button" onClick={() => submit("up")} style={{ background: "transparent", border: "1px solid var(--line)", color: "var(--text)" }}>sign up</button>
+          <Link href="/signup" className="muted" style={{ alignSelf: "center", marginLeft: 8 }}>new here? <span style={{ color: "var(--accent)" }}>make an account</span></Link>
         </div>
         {error && <p className="error">{error}</p>}
       </form>

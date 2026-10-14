@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { applyContentFilter, blurCover, type Character, compact, type ContentFilter, type CreatorProfile, myProfile, profileName, supabase } from "@/lib/supabase";
 
 export default function CreatorPage() {
-  const { username } = useParams<{ username: string }>();
+  const params = useParams<{ handle: string }>();
+  // the #tag arrives url-encoded
+  const handle = (() => { try { return decodeURIComponent(params.handle); } catch { return params.handle; } })();
   const [creator, setCreator] = useState<CreatorProfile | null | undefined>(undefined);
   const [bots, setBots] = useState<Character[]>([]);
   const [me, setMe] = useState<string | null>(null);
@@ -14,7 +16,7 @@ export default function CreatorPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: c } = await supabase.from("creator_profiles").select("*").eq("username", username).maybeSingle<CreatorProfile>();
+      const { data: c } = await supabase.from("creator_profiles").select("*").eq("handle", handle).maybeSingle<CreatorProfile>();
       setCreator(c);
       if (!c) return;
       const profile = await myProfile();
@@ -29,7 +31,7 @@ export default function CreatorPage() {
         setFollowing(!!f);
       }
     })();
-  }, [username]);
+  }, [handle]);
 
   async function toggleFollow() {
     if (!creator || !me) return;
@@ -40,16 +42,16 @@ export default function CreatorPage() {
   }
 
   if (creator === undefined) return <main className="muted">loading…</main>;
-  if (creator === null) return <main className="muted">no one goes by @{username}</main>;
+  if (creator === null) return <main className="muted">no one goes by {handle}</main>;
 
   return (
     <main>
       <div className="panel" style={{ marginBottom: 16 }}>
         <div className="row" style={{ gap: 16 }}>
-          <span className="mini-avatar" style={{ width: 72, height: 72, fontSize: 28 }}>{creator.avatar_url ? <img src={creator.avatar_url} alt="" /> : (creator.display_name ?? creator.username ?? "?")[0]}</span>
+          <span className="mini-avatar" style={{ width: 72, height: 72, fontSize: 28 }}>{creator.avatar_url ? <img src={creator.avatar_url} alt="" /> : (creator.display_name || creator.handle || "?")[0]}</span>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <h1 style={{ margin: 0, fontSize: 24 }}>{profileName(creator)}</h1>
-            {creator.username && <span className="muted">@{creator.username}</span>}
+            {creator.handle && <span className="muted">{creator.handle}</span>}
           </div>
           {me && me !== creator.id && (
             <button style={{ marginLeft: "auto" }} className={following ? "btn-ghost" : undefined} onClick={toggleFollow}>{following ? "following" : "follow"}</button>

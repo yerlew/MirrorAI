@@ -5,7 +5,7 @@ import { CHATS_CHANGED } from "@/components/ChatList";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { PersonaPicker } from "@/components/PersonaPicker";
 import { sendMessage } from "@/lib/chat";
-import { type Character, creatorName, type Message, profileName, supabase } from "@/lib/supabase";
+import { type Character, creatorName, handleHref, type Message, profileName, supabase } from "@/lib/supabase";
 import { download, exportChat } from "@/lib/transfer";
 
 const REPORT_REASONS = [
@@ -47,7 +47,7 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) return;
       setLoggedIn(true);
-      const { data: me } = await supabase.from("profiles").select("display_name, username").eq("id", auth.user.id).single();
+      const { data: me } = await supabase.from("profiles").select("display_name, handle").eq("id", auth.user.id).single();
       setProfileLabel(profileName(me));
       // resume the most recent chat with this character, if any
       const { data: chat } = await supabase.from("chats").select("id, persona:personas(name)").eq("character_id", id)
@@ -165,7 +165,7 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
           <br />
           {character.tagline}
           <br />
-          by {character.creator_username ? <Link href={`/u/${character.creator_username}`} style={{ color: "var(--accent)" }}>{creatorName(character)}</Link> : creatorName(character)}
+          by {character.creator_handle ? <Link href={handleHref(character.creator_handle)} style={{ color: "var(--accent)" }}>{creatorName(character)}</Link> : creatorName(character)}
         </div>
         {starting && loggedIn && (
           <PersonaPicker characterId={character.id} characterName={character.name} profileLabel={profileLabel} value={personaId} onChange={setPersonaId} />

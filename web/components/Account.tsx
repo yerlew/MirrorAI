@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CONTENT_FILTERS, type ContentFilter, type Persona, type Profile, supabase } from "@/lib/supabase";
+import { CONTENT_FILTERS, type ContentFilter, type Persona, type Profile, handleHref, supabase, usernameProblem } from "@/lib/supabase";
 
 export type AccountSection = "user" | "profiles" | "settings";
 
@@ -32,11 +32,13 @@ export function Account({ section }: { section: AccountSection }) {
     e.preventDefault();
     if (!profile) return;
     setError("");
-    const { error } = await supabase.from("profiles")
-      .update({ display_name: profile.display_name, username: profile.username?.toLowerCase() || null, bio: profile.bio })
-      .eq("id", profile.id);
-    if (error) setError(error.message.includes("username") ? "username: 3-24 chars, a-z 0-9 _ only, and not taken" : error.message);
-    else setSaved("saved");
+    const problem = usernameProblem(profile.username ?? "");
+    if (problem) return setError(problem);
+    const { data, error } = await supabase.from("profiles")
+      .update({ display_name: profile.display_name, username: profile.username?.trim(), bio: profile.bio })
+      .eq("id", profile.id).select().single<Profile>();
+    if (error) setError(error.message);
+    else { setProfile(data); setSaved("saved"); }
   }
 
   async function setFilter(f: ContentFilter) {
@@ -67,7 +69,7 @@ export function Account({ section }: { section: AccountSection }) {
   }
 
   if (userId === undefined) return <main className="muted">loading…</main>;
-  if (userId === null) return <main><p>you're not logged in. <Link href="/login" style={{ color: "var(--accent)" }}>log in or sign up</Link></p></main>;
+  if (userId === null) return <main><p>you're not logged in. <Link href="/login" style={{ color: "var(--accent)" }}>log in</Link> or <Link href="/signup" style={{ color: "var(--accent)" }}>sign up</Link></p></main>;
 
   return (
     <main style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
@@ -78,8 +80,9 @@ export function Account({ section }: { section: AccountSection }) {
           <label className="field">display name
             <input value={profile.display_name ?? ""} onChange={(e) => { setProfile({ ...profile, display_name: e.target.value }); setSaved(""); }} maxLength={40} />
           </label>
-          <label className="field">username
-            <input value={profile.username ?? ""} placeholder="pick one" onChange={(e) => { setProfile({ ...profile, username: e.target.value }); setSaved(""); }} maxLength={24} />
+          <label className="field">username {profile.handle && <span>· you're <strong style={{ color: "var(--text)" }}>{profile.handle}</strong></span>}
+            <input value={profile.username ?? ""} placeholder="pick one" onChange={(e) => { setProfile({ ...profile, username: e.target.value }); setSaved(""); }} maxLength={32} />
+            <span>Anything goes except #. Your #tag is added for you; changing your name gets you a new tag.</span>
           </label>
           <label className="field">bio
             <textarea rows={3} value={profile.bio ?? ""} maxLength={500} placeholder="shows on your public creator page" onChange={(e) => { setProfile({ ...profile, bio: e.target.value }); setSaved(""); }} />
@@ -87,7 +90,7 @@ export function Account({ section }: { section: AccountSection }) {
           <div className="row">
             <button>save</button>
             <span className="muted">{saved}</span>
-            {profile.username && <Link href={`/u/${profile.username}`} className="muted" style={{ color: "var(--accent)" }}>view public page</Link>}
+            {profile.handle && <Link href={handleHref(profile.handle)} className="muted" style={{ color: "var(--accent)" }}>view public page</Link>}
           </div>
         </form>
       )}

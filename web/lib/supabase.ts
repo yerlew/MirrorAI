@@ -12,6 +12,7 @@ export type Character = {
   creator_id: string | null;
   creator_name: string | null;
   creator_username: string | null;
+  creator_handle: string | null; // username#tag, e.g. Yerlew#1
   name: string;
   tagline: string | null;
   avatar_url: string | null;
@@ -43,6 +44,7 @@ export type Character = {
 export type Profile = {
   id: string;
   username: string | null;
+  handle: string | null; // username#tag, unique
   display_name: string | null;
   avatar_url: string | null;
   bio: string;
@@ -79,6 +81,7 @@ export function blurCover(c: Character, filter: ContentFilter) {
 export type CreatorProfile = {
   id: string;
   username: string | null;
+  handle: string | null; // username#tag, unique
   display_name: string | null;
   avatar_url: string | null;
   bio: string;
@@ -90,12 +93,12 @@ export type CreatorProfile = {
 // private, only ever readable by their owner
 export type Persona = { id: string; user_id: string; name: string; backstory: string; avatar_url: string | null };
 
-export function profileName(p?: { display_name: string | null; username: string | null } | null) {
-  return p?.display_name || (p?.username ? `@${p.username}` : "");
+export function profileName(p?: { display_name: string | null; handle: string | null } | null) {
+  return p?.display_name || p?.handle || "";
 }
 
 export function creatorName(c: Character) {
-  return c.anonymous ? "anonymous" : profileName({ display_name: c.creator_name, username: c.creator_username });
+  return c.anonymous ? "anonymous" : profileName({ display_name: c.creator_name, handle: c.creator_handle });
 }
 
 export type Message = { id: number | string; role: "user" | "assistant"; content: string };
@@ -110,4 +113,16 @@ export async function myProfile(): Promise<Profile | null> {
 
 export function compact(n: number) {
   return Intl.NumberFormat("en", { notation: "compact" }).format(n);
+}
+
+/** link to someone's public page by their username#tag */
+export const handleHref = (handle: string) => `/u/${encodeURIComponent(handle)}`;
+
+/** usernames can be anything except # and control characters, 1-32 long */
+export function usernameProblem(name: string) {
+  const n = name.trim();
+  if (!n) return "pick a username";
+  if (n.length > 32) return "username: 32 characters max";
+  if (/[#\p{Cc}]/u.test(n)) return "username can't contain #";
+  return "";
 }
