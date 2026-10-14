@@ -163,3 +163,5 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 .msg-delete { opacity: 0; font-size: 13px; width: 28px; height: 28px; transition: opacity 0.15s; }
 .msg:hover .msg-delete, .msg-delete:focus-visible { opacity: 1; }
 @media (hover: none) { .msg-delete { opacity: 0.6; } }
+.canon { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+.canon input[type="range"] { flex: 1; padding: 0; border: 0; background: transparent; accent-color: var(--accent); }

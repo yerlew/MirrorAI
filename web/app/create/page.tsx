@@ -19,6 +19,9 @@ export default function Create() {
   const [customTrait, setCustomTrait] = useState("");
   const [quirks, setQuirks] = useState<Quirk[]>([]);
   const [warmup, setWarmup] = useState<Warmup>("slow");
+  const [basedOn, setBasedOn] = useState<"original" | "character" | "real">("original");
+  const [canonSource, setCanonSource] = useState("");
+  const [canon, setCanon] = useState(70);
   const toggleTrait = (t: string) => setTraits((ts) => (ts.includes(t) ? ts.filter((x) => x !== t) : ts.length < 20 ? [...ts, t] : ts));
   function addCustomTrait() {
     const t = customTrait.trim().slice(0, 40);
@@ -45,12 +48,15 @@ export default function Create() {
       categories,
       ai_art: aiArt,
       minor,
-      nsfw: !minor && nsfw,
+      nsfw: !minor && basedOn !== "real" && nsfw,
       nsfw_cover: !minor && (nsfw || nsfwCover),
       anonymous,
       traits,
       quirks: quirks.filter((q) => q.text.trim()).map((q) => ({ ...q, text: q.text.trim() })),
       warmup,
+      canon_source: basedOn === "original" ? "" : canonSource.trim(),
+      canon,
+      real_person: basedOn === "real",
       tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean),
       creator_id: auth.user.id,
     }).select("id").single();
@@ -75,6 +81,31 @@ export default function Create() {
           {PICKABLE.map((c) => (
             <button type="button" key={c.key} className="chip" aria-pressed={categories.includes(c.key)} onClick={() => toggle(c.key)}>{c.label}</button>
           ))}
+        </div>
+        <div className="builder">
+          <strong>Based on</strong>
+          <div className="segmented" role="group" aria-label="Based on" style={{ alignSelf: "flex-start" }}>
+            {([["original", "Original (OC)"], ["character", "Existing character"], ["real", "Real person"]] as const).map(([k, label]) => (
+              <button type="button" key={k} aria-pressed={basedOn === k} onClick={() => setBasedOn(k)}>{label}</button>
+            ))}
+          </div>
+          {basedOn !== "original" && (
+            <>
+              <input placeholder={basedOn === "real" ? "who, e.g. their name and what they're known for" : "from what, e.g. Jujutsu Kaisen (anime/manga)"}
+                value={canonSource} maxLength={200} onChange={(e) => setCanonSource(e.target.value)} required />
+              <label className="canon">
+                <span>non-canon</span>
+                <input type="range" min={0} max={100} step={5} value={canon} onChange={(e) => setCanon(Number(e.target.value))} />
+                <span>canon</span>
+              </label>
+              <span className="muted">
+                {canon >= 70 && "Sticks to canon: personality, voice, relationships and events from the source. Your notes below add to it."}
+                {canon >= 35 && canon < 70 && "Canon-inspired: canon personality and backstory, but the story can go its own way. Your notes win where they differ."}
+                {canon < 35 && "Non-canon / AU: only the name, look and vibe come from the source. Your notes define the rest."}
+                {basedOn === "real" && " Real-person bots can't be 18+."}
+              </span>
+            </>
+          )}
         </div>
         <input placeholder="avatar image url (optional)" value={f.avatar_url} onChange={set("avatar_url")} />
         <label className="switch" style={{ marginLeft: 0 }}>
@@ -129,7 +160,7 @@ export default function Create() {
           <input type="checkbox" role="switch" checked={minor} onChange={(e) => setMinor(e.target.checked)} />
           this character is under 18 (locks the bot to non-NSFW for good)
         </label>
-        {!minor && (
+        {!minor && basedOn !== "real" && (
           <label className="switch" style={{ marginLeft: 0 }}>
             <input type="checkbox" role="switch" checked={nsfw} onChange={(e) => setNsfw(e.target.checked)} />
             this bot is 18+ (hidden from anyone with the NSFW filter on)

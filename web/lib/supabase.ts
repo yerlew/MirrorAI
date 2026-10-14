@@ -31,6 +31,9 @@ export type Character = {
   traits: string[];
   quirks: Quirk[];
   warmup: Warmup;
+  canon_source: string; // e.g. "Jujutsu Kaisen", or the celebrity's name. empty = original character
+  canon: number; // 0 loose / AU … 100 strict canon
+  real_person: boolean;
   anonymous: boolean;
 };
 

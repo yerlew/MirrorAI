@@ -17,6 +17,9 @@ function personality(x: ImportedBot["extra"]) {
       : [],
     warmup: ["never", "slow", "normal"].includes(str(x.warmup)) ? x.warmup : "slow",
     minor: x.minor === true,
+    canon_source: str(x.canon_source).slice(0, 200),
+    canon: typeof x.canon === "number" ? Math.max(0, Math.min(100, Math.round(x.canon))) : 50,
+    real_person: x.real_person === true,
   };
 }
 

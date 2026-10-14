@@ -28,6 +28,7 @@ const cors = {
 
 type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
   background: string; traits: string[]; quirks: Quirk[]; warmup: "never" | "slow" | "normal";
+  canon_source: string; canon: number; real_person: boolean;
 };
 type Quirk = { text: string; frequency: "always" | "often" | "sometimes" | "rarely" };
 type Row = { id: number; role: "user" | "assistant"; content: string };
@@ -53,6 +54,7 @@ function systemPrompt(raw: Character, user: User, memory: string, pinned: string
   const c = { ...raw, persona: fill(raw.persona), scenario: fill(raw.scenario), greeting: fill(raw.greeting), background: fill(raw.background ?? "") };
   return [
     `You are ${c.name}, a character in an interactive roleplay chat. Stay in character for the whole conversation; never mention being an AI model unless the user steps out of the story and asks directly.`,
+    canonNote(c),
     `<persona>\n${c.persona}\n</persona>`,
     c.background && `<background>\n${c.background}\n</background>`,
     c.traits?.length && `<core_traits>\n${c.traits.join(", ")}\n</core_traits>\nThese traits are who you are. They hold for the whole chat, no matter how long it runs or how the user treats you.`,
@@ -101,9 +103,30 @@ function characterCheck(c: Character, userTurns: number) {
   ].filter(Boolean).join("\n");
 }
 
+/** for bots based on an existing character or a real person: how much to lean on what the model knows about the source */
+function canonNote(c: Character) {
+  const source = c.canon_source?.trim();
+  if (!source) return "";
+  const who = c.real_person
+    ? `${c.name} is based on a real person (${source}). Draw on their public persona: how they talk, their known work and public history.`
+    : `${c.name} is the character from ${source}. Draw on what you know of that source: their personality, speech patterns, abilities, relationships and history.`;
+  const level = c.canon >= 70
+    ? "Stick closely to canon. Don't contradict established facts, relationships or events, and keep their canon voice. Where the creator's notes below add detail, they extend canon."
+    : c.canon >= 35
+      ? "Canon-inspired. Keep their canon personality, voice and backstory, but the story here can diverge from canon events. The creator's notes below win where they differ."
+      : "Loose / alternate universe. Use canon only for their name, look and broad vibe; the creator's notes below define everything else.";
+  const realPerson = c.real_person
+    ? " This is fiction inspired by a real person: never present invented private details, scandals or claims as real facts about them."
+    : "";
+  return `<source>\n${who} ${level}${realPerson}\n</source>`;
+}
+
 /** the built-in filter. non-nsfw bots stay non-explicit; minors are never sexualized on any bot. */
 function contentRules(c: Character) {
   const minors = "Never write sexual or romantic content involving anyone under 18. If the user pushes for it, steer the story away in character.";
+  if (c.real_person && !c.minor) {
+    return `Content rules: ${c.name} is based on a real person, so keep this story non-explicit: no sexual content about them. ${minors}`;
+  }
   if (c.minor) return `${c.name} is under 18. ${minors}`;
   if (!c.nsfw) {
     return `Content rules: keep this story non-explicit. No sexual content; romance can be affectionate, then fade to black. No graphic gore or torture. If the user pushes past that, steer the story another way in character instead of breaking the scene. ${minors}`;
@@ -226,7 +249,7 @@ Deno.serve(async (req) => {
     return new Response("character not found", { status: 404, headers: cors });
   }
   // age checks are off for now (zero users); bring back a check on profiles.adult_confirmed_at before launch
-  if (character.minor) character.nsfw = false;
+  if (character.minor || character.real_person) character.nsfw = false;
 
   type Chat = { id: string; memory: string; pinned: string; memory_through: number; persona_id: string | null };
   let chat: Chat | null = null;
