@@ -166,3 +166,42 @@ label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; 
 @media (hover: none) { .msg-delete { opacity: 0.6; } }
 .canon { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
 .canon input[type="range"] { flex: 1; padding: 0; border: 0; background: transparent; accent-color: var(--accent); }
+
+/* bot info: intro card at the top of a chat, and the right column on the full chat page */
+.bot-info { display: flex; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.bot-info .cover { position: relative; flex: none; width: 96px; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--surface-2), var(--accent-soft)); display: grid; place-items: center; font-size: 40px; font-weight: 800; color: var(--accent); }
+.bot-info .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bot-info-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 14px; }
+.bot-info h2 { margin: 0; font-size: 18px; }
+.bot-info .stats { display: flex; gap: 14px; font-weight: 600; font-size: 13px; }
+.bot-info .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.bot-info .intro { color: var(--muted); white-space: pre-wrap; line-height: 1.45; }
+.bot-info .collect { align-self: flex-start; padding: 6px 12px; font-size: 13px; }
+.bot-info .collect.on { color: var(--accent); border-color: var(--accent); }
+.bot-info.side { flex-direction: column; border: 0; border-radius: 0; background: transparent; padding: 16px; }
+.bot-info.side .cover { width: 100%; font-size: 72px; }
+.bot-info.side .intro { font-size: 13px; }
+.chat-page { display: flex; }
+.chat-page > .chat { flex: 1; min-width: 0; }
+.bot-side { display: none; }
+@media (min-width: 1200px) {
+  .bot-side { display: block; width: 320px; flex: none; height: calc(100dvh - 57px); overflow-y: auto; border-left: 1px solid var(--line); }
+  /* the right column already shows the cover and stats, so the in-chat card shrinks to the intro */
+  .chat-page .log .bot-info .cover, .chat-page .log .bot-info h2, .chat-page .log .bot-info .stats, .chat-page .log .bot-info .tags, .chat-page .log .bot-info .collect, .chat-page .log .bot-info .bot-info-body > .muted { display: none; }
+}
+.in-pane .bot-info .cover { width: 72px; font-size: 30px; }
+
+/* notifications */
+.nav-extra a, .sidebar nav a { position: relative; }
+.unread-dot { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; display: grid; place-items: center; }
+.mobile-nav .unread-dot { position: absolute; top: 0; right: 0; min-width: 16px; height: 16px; font-size: 9px; padding: 0 4px; }
+.notifs { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; }
+.notifs li { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-bottom: 1px solid var(--line); }
+.notifs li.unread { background: var(--accent-soft); }
+.notif-text { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.notif-text .muted { font-size: 12px; }
+
+/* limited: the creator deleted it, collectors keep it */
+.badge.limited { color: #f5c96a; border-color: #f5c96a; text-transform: uppercase; letter-spacing: 0.04em; }
+.card.is-limited { border-color: #f5c96a66; }
+.btn-ghost.danger { color: var(--danger); }

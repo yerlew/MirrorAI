@@ -26,7 +26,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
 };
 
-type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
+type Character = { id: string; deleted_at: string | null; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
   background: string; traits: string[]; quirks: Quirk[]; warmup: "never" | "slow" | "normal";
   canon_source: string; canon: number; canon_context: string; real_person: boolean;
 };
@@ -250,6 +250,11 @@ Deno.serve(async (req) => {
   const { data: character } = await admin.from("characters").select("*").eq("id", body.character_id).single<Character>();
   if (!character || (character.visibility === "private" && character.creator_id !== userId)) {
     return new Response("character not found", { status: 404, headers: cors });
+  }
+  // a limited bot (its creator deleted it) only lives on for the people who collected it
+  if (character.deleted_at) {
+    const { data: kept } = await admin.from("collections").select("user_id").eq("user_id", userId).eq("character_id", character.id).maybeSingle();
+    if (!kept) return new Response("character not found", { status: 404, headers: cors });
   }
   // age checks are off for now (zero users); bring back a check on profiles.adult_confirmed_at before launch
   if (character.minor || character.real_person) character.nsfw = false;

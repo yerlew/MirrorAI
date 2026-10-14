@@ -8,7 +8,7 @@ const PICKABLE = CATEGORIES.filter((c) => c.key !== "recommended");
 
 export default function Create() {
   const router = useRouter();
-  const [f, setF] = useState({ name: "", tagline: "", avatar_url: "", art_credit: "", greeting: "", persona: "", scenario: "", tags: "", visibility: "public", gender: "", background: "" });
+  const [f, setF] = useState({ name: "", intro: "", avatar_url: "", art_credit: "", greeting: "", persona: "", scenario: "", tags: "", visibility: "public", gender: "", background: "" });
   const [categories, setCategories] = useState<string[]>([]);
   const [aiArt, setAiArt] = useState(false);
   const [nsfw, setNsfw] = useState(false);
@@ -43,6 +43,7 @@ export default function Create() {
     if (!auth.user) { setError("log in first"); setBusy(false); return; }
     const { data, error } = await supabase.from("characters").insert({
       ...f,
+      tagline: f.intro.split("\n")[0].slice(0, 140),
       avatar_url: f.avatar_url || null,
       art_credit: aiArt ? null : f.art_credit || null,
       gender: f.gender || null,
@@ -72,7 +73,9 @@ export default function Create() {
       <form className="stack" onSubmit={submit}>
         <h2 style={{ margin: 0 }}>new character</h2>
         <input placeholder="name" value={f.name} onChange={set("name")} required maxLength={60} />
-        <input placeholder="tagline, one line" value={f.tagline} onChange={set("tagline")} maxLength={140} />
+        <label className="field">intro: shows on the thumbnail and at the top of the chat
+          <textarea rows={3} placeholder="who they are, the setup, what to expect" value={f.intro} onChange={set("intro")} maxLength={2000} />
+        </label>
         <select value={f.gender} onChange={set("gender")}>
           <option value="">gender: unspecified</option>
           <option value="male">male</option>
@@ -163,7 +166,9 @@ export default function Create() {
           </select>
         </label>
         <textarea rows={3} placeholder="scenario: where the chat starts (optional)" value={f.scenario} onChange={set("scenario")} />
-        <textarea rows={3} placeholder="greeting: their first message" value={f.greeting} onChange={set("greeting")} />
+        <label className="field">starting message: the bot opens the chat with this, so you can set the scene. use *asterisks* for actions and context
+          <textarea rows={4} placeholder="*leans on the doorframe* took you long enough." value={f.greeting} onChange={set("greeting")} />
+        </label>
         <input placeholder="extra tags, comma separated" value={f.tags} onChange={set("tags")} />
         <label className="switch" style={{ marginLeft: 0 }}>
           <input type="checkbox" role="switch" checked={minor} onChange={(e) => setMinor(e.target.checked)} />

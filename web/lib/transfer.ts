@@ -6,6 +6,7 @@ import type { Character, Message } from "./supabase";
 export type ImportedBot = {
   name: string;
   tagline: string;
+  intro: string;
   persona: string;
   scenario: string;
   greeting: string;
@@ -33,7 +34,7 @@ export function exportChat(c: Character, messages: Message[], memory: string, pi
         scenario: c.scenario,
         first_mes: c.greeting,
         mes_example: "",
-        creator_notes: c.tagline ?? "",
+        creator_notes: c.intro || c.tagline || "",
         tags: c.tags,
         extensions: { mirrorai: { background: c.background, traits: c.traits, quirks: c.quirks, warmup: c.warmup, minor: c.minor, canon_source: c.canon_source, canon: c.canon, canon_context: c.canon_context, real_person: c.real_person } },
       },
@@ -66,7 +67,8 @@ function fromCard(raw: Record<string, unknown>): ImportedBot | null {
   ].filter(Boolean).join("\n\n");
   return {
     name: String(d.name).slice(0, 60),
-    tagline: (d.creator_notes ?? "").slice(0, 140),
+    tagline: (d.creator_notes ?? "").split("\n")[0].slice(0, 140),
+    intro: (d.creator_notes ?? "").slice(0, 2000),
     persona: persona.slice(0, 8000),
     scenario: d.scenario ?? "",
     greeting: d.first_mes ?? "",
@@ -108,7 +110,7 @@ function fromSillyTavernChat(text: string): Imported {
     .filter((l) => typeof l.mes === "string" && !l.is_system)
     .map((l) => ({ role: (l.is_user ? "user" : "assistant") as ImportedMessage["role"], content: l.mes }));
   const bot = meta?.character_name
-    ? { name: String(meta.character_name).slice(0, 60), tagline: "", persona: "", scenario: "", greeting: "", tags: [], source: "sillytavern_chat" }
+    ? { name: String(meta.character_name).slice(0, 60), tagline: "", intro: "", persona: "", scenario: "", greeting: "", tags: [], source: "sillytavern_chat" }
     : null;
   return { bot, messages };
 }

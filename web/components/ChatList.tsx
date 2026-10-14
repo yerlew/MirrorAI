@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { LimitedBadge } from "@/components/BotInfo";
 import { type Character, supabase } from "@/lib/supabase";
 
 export const CHATS_CHANGED = "mirror:chats-changed";
@@ -49,7 +50,7 @@ export function ChatList({ compact = false }: { compact?: boolean }) {
           <Link href={`/c/${c.id}`}>
             <span className="mini-avatar">{c.avatar_url && !c.nsfw_cover ? <img src={c.avatar_url} alt="" /> : c.name[0]}</span>
             <span className="chatlist-text">
-              <strong>{c.name}</strong>
+              <strong>{c.name}{c.limited && <LimitedBadge />}</strong>
               <span className="muted">{new Date(updated_at).toLocaleDateString()}</span>
             </span>
           </Link>

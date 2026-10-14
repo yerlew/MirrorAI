@@ -22,7 +22,7 @@ export default function CreatorPage() {
       const profile = await myProfile();
       setMe(profile?.id ?? null);
       setFilter(profile?.content_filter ?? "sfw");
-      let q = supabase.from("character_cards").select("*").eq("creator_id", c.id).eq("visibility", "public").order("chat_count", { ascending: false });
+      let q = supabase.from("character_cards").select("*").eq("creator_id", c.id).eq("visibility", "public").eq("limited", false).order("chat_count", { ascending: false });
       q = applyContentFilter(q, profile?.content_filter ?? "sfw");
       const { data: b } = await q;
       setBots((b as Character[]) ?? []);
@@ -70,11 +70,11 @@ export default function CreatorPage() {
             <div className="art">
               {c.name[0]}
               {c.avatar_url && <img src={c.avatar_url} alt="" className={blurCover(c, filter) ? "blur" : undefined} />}
-              <span className="count">💬 {compact(c.chat_count)}</span>
+              <span className="count">💬 {compact(c.message_count)}</span>
             </div>
             <div className="body">
               <span className="name">{c.name}</span>
-              {c.tagline && <span className="tagline">{c.tagline}</span>}
+              {(c.intro || c.tagline) && <span className="tagline">{c.intro || c.tagline}</span>}
             </div>
           </Link>
         ))}

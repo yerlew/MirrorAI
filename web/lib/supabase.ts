@@ -4,6 +4,8 @@ export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 // the vercel supabase integration also sets the newer "publishable" key name; either works
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
 
+export const NOTIFICATIONS_READ = "mirrorai:notifications-read";
+
 export const supabase = createClient(SUPABASE_URL || "http://localhost:54321", ANON_KEY || "anon");
 
 /** a row of the character_cards view: what anyone may see about a bot. creator fields are null for anonymous bots. */
@@ -38,6 +40,11 @@ export type Character = {
   canon_context: string; // which part of the source canon comes from, e.g. season / episode
   real_person: boolean;
   anonymous: boolean;
+  intro: string; // set by the creator: shows on the thumbnail and at the top of the chat
+  message_count: number; // messages people have sent this bot
+  user_count: number; // people who have chatted with it
+  collect_count: number;
+  limited: boolean; // the creator deleted it; only people who collected it still have it
 };
 
 // public identity: shown on comments and on the bots you post

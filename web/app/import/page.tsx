@@ -58,7 +58,7 @@ export default function ImportPage() {
       if (!auth.user) throw new Error("log in first");
       const { bot } = parsed;
       const { data: character, error: e1 } = await supabase.from("characters").insert({
-        creator_id: auth.user.id, name: bot.name, tagline: bot.tagline, persona: bot.persona, scenario: bot.scenario,
+        creator_id: auth.user.id, name: bot.name, tagline: bot.tagline, intro: bot.intro, persona: bot.persona, scenario: bot.scenario,
         greeting: bot.greeting, tags: bot.tags, visibility: "private", imported_from: bot.source, ...personality(bot.extra),
       }).select("id").single();
       if (e1) throw e1;
