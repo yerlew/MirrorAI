@@ -2,10 +2,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { CHATS_CHANGED } from "@/components/ChatList";
+import { BotInfo } from "@/components/BotInfo";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { PersonaPicker } from "@/components/PersonaPicker";
+import { RichText } from "@/components/RichText";
 import { sendMessage } from "@/lib/chat";
-import { type Character, creatorName, type Message, profileName, supabase } from "@/lib/supabase";
+import { type Character, type Message, profileName, supabase } from "@/lib/supabase";
 import { download, exportChat } from "@/lib/transfer";
 
 const REPORT_REASONS = [
@@ -47,7 +49,7 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) return;
       setLoggedIn(true);
-      const { data: me } = await supabase.from("profiles").select("display_name, username").eq("id", auth.user.id).single();
+      const { data: me } = await supabase.from("profiles").select("display_name, handle").eq("id", auth.user.id).single();
       setProfileLabel(profileName(me));
       // resume the most recent chat with this character, if any
       const { data: chat } = await supabase.from("chats").select("id, persona:personas(name)").eq("character_id", id)
@@ -133,7 +135,7 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
   if (!character) return <div className={`chat${pane ? " in-pane" : ""}`}><p className="muted" style={{ padding: 16 }}>loading…</p></div>;
   const starting = !chatId && messages.length === 0;
 
-  return (
+  const chat = (
     <div className={`chat${pane ? " in-pane" : ""}`}>
       {pane && (
         <div className="pane-head">
@@ -160,23 +162,17 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
         </div>
       )}
       <div className="log" ref={logRef}>
-        <div className="muted" style={{ textAlign: "center" }}>
-          <strong style={{ color: "var(--text)" }}>{character.name}</strong>
-          <br />
-          {character.tagline}
-          <br />
-          by {character.creator_username ? <Link href={`/u/${character.creator_username}`} style={{ color: "var(--accent)" }}>{creatorName(character)}</Link> : creatorName(character)}
-        </div>
+        <BotInfo c={character} />
         {starting && loggedIn && (
           <PersonaPicker characterId={character.id} characterName={character.name} profileLabel={profileLabel} value={personaId} onChange={setPersonaId} />
         )}
         {starting && !loggedIn && (
           <p className="muted" style={{ textAlign: "center" }}><Link href="/login" style={{ color: "var(--accent)" }}>log in</Link> to chat</p>
         )}
-        {character.greeting && <div className="bubble">{character.greeting}</div>}
+        {character.greeting && <div className="msg assistant"><div className="bubble assistant"><RichText text={character.greeting} /></div></div>}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role}`}>
-            <div className={`bubble ${m.role}`}>{m.content || "…"}</div>
+            <div className={`bubble ${m.role}`}>{m.content ? <RichText text={m.content} user={m.role === "user"} /> : "…"}</div>
             {typeof m.id === "number" && !busy && (
               <button type="button" className="icon-btn msg-delete" title="delete this and everything after" aria-label="delete this and everything after" onClick={() => deleteFrom(m)}>🗑</button>
             )}
@@ -189,6 +185,13 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} />
         <button disabled={busy || !draft.trim()}>send</button>
       </form>
+    </div>
+  );
+  if (pane) return chat;
+  return (
+    <div className="chat-page">
+      {chat}
+      <aside className="bot-side"><BotInfo c={character} side /></aside>
     </div>
   );
 }

@@ -4,6 +4,8 @@ export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 // the vercel supabase integration also sets the newer "publishable" key name; either works
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
 
+export const NOTIFICATIONS_READ = "mirrorai:notifications-read";
+
 export const supabase = createClient(SUPABASE_URL || "http://localhost:54321", ANON_KEY || "anon");
 
 /** a row of the character_cards view: what anyone may see about a bot. creator fields are null for anonymous bots. */
@@ -12,6 +14,7 @@ export type Character = {
   creator_id: string | null;
   creator_name: string | null;
   creator_username: string | null;
+  creator_handle: string | null; // username#tag, e.g. Yerlew#0
   name: string;
   tagline: string | null;
   avatar_url: string | null;
@@ -37,12 +40,19 @@ export type Character = {
   canon_context: string; // which part of the source canon comes from, e.g. season / episode
   real_person: boolean;
   anonymous: boolean;
+  intro: string; // set by the creator: shows on the thumbnail and at the top of the chat
+  message_count: number; // messages people have sent this bot
+  user_count: number; // people who have chatted with it
+  collect_count: number;
+  limited: boolean; // the creator deleted it; only people who collected it still have it
 };
 
 // public identity: shown on comments and on the bots you post
 export type Profile = {
   id: string;
   username: string | null;
+  tag: string; // permanent number tag, handed out in signup order: 0..9, 00..99, 000..
+  handle: string | null; // username#tag, unique
   display_name: string | null;
   avatar_url: string | null;
   bio: string;
@@ -79,6 +89,7 @@ export function blurCover(c: Character, filter: ContentFilter) {
 export type CreatorProfile = {
   id: string;
   username: string | null;
+  handle: string | null; // username#tag, unique
   display_name: string | null;
   avatar_url: string | null;
   bio: string;
@@ -90,12 +101,12 @@ export type CreatorProfile = {
 // private, only ever readable by their owner
 export type Persona = { id: string; user_id: string; name: string; backstory: string; avatar_url: string | null };
 
-export function profileName(p?: { display_name: string | null; username: string | null } | null) {
-  return p?.display_name || (p?.username ? `@${p.username}` : "");
+export function profileName(p?: { display_name: string | null; handle: string | null } | null) {
+  return p?.display_name || p?.handle || "";
 }
 
 export function creatorName(c: Character) {
-  return c.anonymous ? "anonymous" : profileName({ display_name: c.creator_name, username: c.creator_username });
+  return c.anonymous ? "anonymous" : profileName({ display_name: c.creator_name, handle: c.creator_handle });
 }
 
 export type Message = { id: number | string; role: "user" | "assistant"; content: string };
@@ -110,4 +121,16 @@ export async function myProfile(): Promise<Profile | null> {
 
 export function compact(n: number) {
   return Intl.NumberFormat("en", { notation: "compact" }).format(n);
+}
+
+/** link to someone's public page by their username#tag */
+export const handleHref = (handle: string) => `/u/${encodeURIComponent(handle)}`;
+
+/** usernames can be anything except # and control characters, 1-32 long */
+export function usernameProblem(name: string) {
+  const n = name.trim();
+  if (!n) return "pick a username";
+  if (n.length > 32) return "username: 32 characters max";
+  if (/[#\p{Cc}]/u.test(n)) return "username can't contain #";
+  return "";
 }

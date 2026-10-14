@@ -53,9 +53,9 @@ export function Browse({ title, searchFirst }: { title: string; searchFirst?: bo
   useEffect(() => {
     if (filter === null) return;
     // "recommended" is popularity for now; swap in a real ranking later
-    let query = supabase.from("character_cards").select("*").eq("visibility", "public").order("chat_count", { ascending: false }).limit(60);
+    let query = supabase.from("character_cards").select("*").eq("visibility", "public").eq("limited", false).order("chat_count", { ascending: false }).limit(60);
     const term = q.trim().replace(/[,()*%\\"]/g, " ").trim();
-    if (term) query = query.or(`name.ilike.*${term}*,tagline.ilike.*${term}*,tags.cs.{"${term.toLowerCase()}"}`);
+    if (term) query = query.or(`name.ilike.*${term}*,tagline.ilike.*${term}*,intro.ilike.*${term}*,tags.cs.{"${term.toLowerCase()}"}`);
     if (gender !== "all") query = query.eq("gender", gender);
     if (category !== "recommended") query = query.contains("categories", [category]);
     if (noAiArt) query = query.eq("ai_art", false);
@@ -99,12 +99,12 @@ export function Browse({ title, searchFirst }: { title: string; searchFirst?: bo
               <div className="art">
                 {c.name[0]}
                 {c.avatar_url && <img src={c.avatar_url} alt="" className={filter && blurCover(c, filter) ? "blur" : undefined} />}
-                <span className="count">💬 {compact(c.chat_count)}</span>
+                <span className="count">💬 {compact(c.message_count)}</span>
                 {c.art_credit && <span className="credit">art: {c.art_credit}</span>}
               </div>
               <div className="body">
                 <span className="name">{c.name}{c.nsfw && <span className="badge">18+</span>}</span>
-                {c.tagline && <span className="tagline">{c.tagline}</span>}
+                {(c.intro || c.tagline) && <span className="tagline">{c.intro || c.tagline}</span>}
                 <span className="muted">by {creatorName(c)}</span>
                 {c.tags.length > 0 && (
                   <div className="tags">{c.tags.slice(0, 4).map((t) => <span key={t} className="tag">{t}</span>)}</div>

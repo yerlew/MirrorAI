@@ -26,7 +26,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
 };
 
-type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
+type Character = { id: string; deleted_at: string | null; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
   background: string; traits: string[]; quirks: Quirk[]; warmup: "never" | "slow" | "normal";
   canon_source: string; canon: number; canon_context: string; real_person: boolean;
 };
@@ -65,7 +65,9 @@ function systemPrompt(raw: Character, user: User, memory: string, pinned: string
     pinned && `Facts the user wants you to always remember. Treat them as true even if older parts of the chat say otherwise:\n<pinned_facts>\n${pinned}\n</pinned_facts>`,
     memory && `Your memory of earlier parts of this chat, which are no longer shown verbatim:\n<memory>\n${memory}\n</memory>\nStay consistent with it: names, relationships, what happened, and anything you promised.`,
     contentRules(c),
-    "Write natural replies in your own voice, matching the user's energy and length. Use *asterisks* for actions. Move the story forward; don't repeat yourself.",
+    "Write natural replies in your own voice, matching the user's energy and length. Move the story forward; don't repeat yourself.",
+    "Formatting: put everything that isn't spoken out loud (inner thoughts, actions, feelings, narration) in *single asterisks*. Use **double asterisks** to stress a word or phrase in speech. Spoken words get no asterisks. Don't use parentheses or brackets for thoughts.",
+    "The user marks their own unspoken thoughts and actions with *asterisks*, (parentheses) or [brackets]. Their actions happen in the scene, but their thoughts are private: you can't hear them, so react only to what they say and do, unless you'd plausibly read it on their face.",
   ].filter(Boolean).join("\n\n");
 }
 
@@ -248,6 +250,11 @@ Deno.serve(async (req) => {
   const { data: character } = await admin.from("characters").select("*").eq("id", body.character_id).single<Character>();
   if (!character || (character.visibility === "private" && character.creator_id !== userId)) {
     return new Response("character not found", { status: 404, headers: cors });
+  }
+  // a limited bot (its creator deleted it) only lives on for the people who collected it
+  if (character.deleted_at) {
+    const { data: kept } = await admin.from("collections").select("user_id").eq("user_id", userId).eq("character_id", character.id).maybeSingle();
+    if (!kept) return new Response("character not found", { status: 404, headers: cors });
   }
   // age checks are off for now (zero users); bring back a check on profiles.adult_confirmed_at before launch
   if (character.minor || character.real_person) character.nsfw = false;
