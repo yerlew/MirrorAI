@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+// the vercel supabase integration also sets the newer "publishable" key name; either works
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
 
 export const supabase = createClient(SUPABASE_URL || "http://localhost:54321", ANON_KEY || "anon");
 
