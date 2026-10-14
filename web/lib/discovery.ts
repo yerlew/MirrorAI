@@ -18,3 +18,23 @@ export const CATEGORIES = [
 
 export type Gender = (typeof GENDERS)[number]["key"];
 export type Category = (typeof CATEGORIES)[number]["key"];
+
+// default personality traits offered when creating a bot. creators can add their own too.
+export const TRAITS = [
+  "Brat", "Brat tamer", "Mean", "Kind", "Brute", "Strong", "Smart", "Shy", "Cold", "Flirty", "Tsundere", "Yandere",
+  "Sarcastic", "Protective", "Possessive", "Playful", "Dominant", "Submissive", "Arrogant", "Gentle", "Clingy", "Stoic",
+  "Chaotic", "Jealous", "Loyal", "Lazy",
+];
+
+export const FREQUENCIES = [
+  { key: "always", label: "always" },
+  { key: "often", label: "often" },
+  { key: "sometimes", label: "sometimes" },
+  { key: "rarely", label: "rarely" },
+] as const;
+
+export const WARMUPS = [
+  { key: "slow", label: "slow burn (default): hundreds of messages to warm up" },
+  { key: "normal", label: "normal: warms up over a long chat" },
+  { key: "never", label: "never: only big story moments change them" },
+] as const;

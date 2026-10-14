@@ -26,7 +26,10 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
 };
 
-type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean };
+type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean; minor: boolean;
+  background: string; traits: string[]; quirks: Quirk[]; warmup: "never" | "slow" | "normal";
+};
+type Quirk = { text: string; frequency: "always" | "often" | "sometimes" | "rarely" };
 type Row = { id: number; role: "user" | "assistant"; content: string };
 type User = { name: string; backstory: string }; // who the bot is talking to
 
@@ -47,10 +50,13 @@ async function loadUser(userId: string, personaId: string | null, characterId: s
 function systemPrompt(raw: Character, user: User, memory: string, pinned: string) {
   // imported character cards use {{char}} / {{user}} placeholders
   const fill = (t: string) => t.replaceAll("{{char}}", raw.name).replaceAll("{{user}}", user.name || "the user");
-  const c = { ...raw, persona: fill(raw.persona), scenario: fill(raw.scenario), greeting: fill(raw.greeting) };
+  const c = { ...raw, persona: fill(raw.persona), scenario: fill(raw.scenario), greeting: fill(raw.greeting), background: fill(raw.background ?? "") };
   return [
     `You are ${c.name}, a character in an interactive roleplay chat. Stay in character for the whole conversation; never mention being an AI model unless the user steps out of the story and asks directly.`,
     `<persona>\n${c.persona}\n</persona>`,
+    c.background && `<background>\n${c.background}\n</background>`,
+    c.traits?.length && `<core_traits>\n${c.traits.join(", ")}\n</core_traits>\nThese traits are who you are. They hold for the whole chat, no matter how long it runs or how the user treats you.`,
+    c.quirks?.length && `<quirks>\n${c.quirks.map(quirkLine).join("\n")}\n</quirks>`,
     c.scenario && `<scenario>\n${c.scenario}\n</scenario>`,
     user.name && `You are talking with ${user.name}.${user.backstory ? ` What you know about them:\n<user_persona>\n${user.backstory}\n</user_persona>` : ""}`,
     c.greeting && `You opened the conversation with this line:\n<greeting>\n${c.greeting}\n</greeting>`,
@@ -59,6 +65,40 @@ function systemPrompt(raw: Character, user: User, memory: string, pinned: string
     contentRules(c),
     "Write natural replies in your own voice, matching the user's energy and length. Use *asterisks* for actions. Move the story forward; don't repeat yourself.",
   ].filter(Boolean).join("\n\n");
+}
+
+const FREQUENCY = { always: "in nearly every reply", often: "in most replies", sometimes: "every few replies", rarely: "once in a while" };
+const quirkLine = (q: Quirk) => `- ${q.text} (${FREQUENCY[q.frequency] ?? FREQUENCY.sometimes})`;
+
+// user turns before each warmup stage. "slow" is the default: real attachment takes hundreds of messages, not 20.
+const WARMUP_STAGES = { slow: [80, 250, 600], normal: [40, 120, 300] };
+const STAGE_TEXT = [
+  "Early. You have no reason to soften toward them yet. Keep your default attitude fully.",
+  "Small cracks. You've started to notice them. A rare, brief moment of warmth can slip out, then you cover it with your usual attitude.",
+  "Growing trust. You're warmer with them specifically, but your edge, traits and habits are all intact. Warmth shows through your style, never replaces it.",
+  "Deep bond. You care about them openly, in your own way. You're still exactly yourself: same traits, same voice, same quirks.",
+];
+
+function warmupStage(c: Character, userTurns: number) {
+  if (c.warmup === "never") {
+    return "Your attitude toward the user doesn't soften with time. Only major story events can shift it, and only in your own style.";
+  }
+  const stages = WARMUP_STAGES[c.warmup] ?? WARMUP_STAGES.slow;
+  return STAGE_TEXT[stages.filter((n) => userTurns >= n).length];
+}
+
+/** re-read before every reply so the personality doesn't melt into generic niceness over a long chat. appended to the
+ * latest user turn (never saved), so the cached system + history prefix stays untouched. */
+function characterCheck(c: Character, userTurns: number) {
+  return [
+    `<character_check>`,
+    `Note from the app, not from the user. Before you reply, re-read your persona, background and memory above, and the chat so far.`,
+    c.traits?.length ? `You are ${c.name}: ${c.traits.join(", ")}. Every one of these still holds.` : `Stay ${c.name}, exactly as your persona describes.`,
+    c.quirks?.length ? `Work your quirks in naturally at their frequency:\n${c.quirks.map(quirkLine).join("\n")}` : "",
+    `Where things stand with the user: ${warmupStage(c, userTurns)}`,
+    `Don't drift into a softer, more generic version of yourself. Being sweet, pushy or sad at you is not enough reason to drop your backbone. If you change, it's slow, earned, and in your own voice.`,
+    `</character_check>`,
+  ].filter(Boolean).join("\n");
 }
 
 /** the built-in filter. non-nsfw bots stay non-explicit; minors are never sexualized on any bot. */
@@ -214,6 +254,11 @@ Deno.serve(async (req) => {
     .eq("chat_id", chat.id).gt("id", chat.memory_through).order("id", { ascending: false }).limit(MAX_VERBATIM);
   const history = ((recent ?? []) as Row[]).reverse();
   while (history.length && history[0].role === "assistant") history.shift(); // must open on a user turn
+  const { count: userTurns } = await admin.from("messages").select("id", { count: "exact", head: true })
+    .eq("chat_id", chat.id).eq("role", "user");
+  const turns: Turn[] = history.map((m) => ({ role: m.role, content: m.content }));
+  const last = turns.at(-1)!;
+  turns[turns.length - 1] = { ...last, content: `${last.content}\n\n${characterCheck(character, userTurns ?? 0)}` };
 
   const enc = new TextEncoder();
   const send = (c: ReadableStreamDefaultController, obj: unknown) => c.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
@@ -224,7 +269,7 @@ Deno.serve(async (req) => {
       let reply = "";
       try {
         const system = systemPrompt(character, user, chat!.memory, chat!.pinned);
-        for await (const text of generate(character.nsfw, system, history.map((m) => ({ role: m.role, content: m.content })), 4096)) {
+        for await (const text of generate(character.nsfw, system, turns, 4096)) {
           reply += text;
           send(controller, { type: "delta", text });
         }

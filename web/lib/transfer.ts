@@ -11,6 +11,7 @@ export type ImportedBot = {
   greeting: string;
   tags: string[];
   source: string;
+  extra?: Partial<Pick<Character, "background" | "traits" | "quirks" | "warmup" | "minor">>; // our own fields, from extensions.mirrorai
 };
 export type ImportedMessage = { role: "user" | "assistant"; content: string };
 // memoryCovers: how many leading messages the memory summary already covers
@@ -28,12 +29,13 @@ export function exportChat(c: Character, messages: Message[], memory: string, pi
       data: {
         name: c.name,
         description: c.persona,
-        personality: "",
+        personality: (c.traits ?? []).join(", "),
         scenario: c.scenario,
         first_mes: c.greeting,
         mes_example: "",
         creator_notes: c.tagline ?? "",
         tags: c.tags,
+        extensions: { mirrorai: { background: c.background, traits: c.traits, quirks: c.quirks, warmup: c.warmup, minor: c.minor } },
       },
     },
     memory,
@@ -50,15 +52,16 @@ export function download(filename: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
-type CardData = { name?: string; description?: string; personality?: string; scenario?: string; first_mes?: string; mes_example?: string; creator_notes?: string; tags?: string[] };
+type CardData = { extensions?: { mirrorai?: ImportedBot["extra"] }; name?: string; description?: string; personality?: string; scenario?: string; first_mes?: string; mes_example?: string; creator_notes?: string; tags?: string[] };
 
 function fromCard(raw: Record<string, unknown>): ImportedBot | null {
   const spec = typeof raw.spec === "string" ? raw.spec : "chara_card_v1";
   const d = (raw.data && typeof raw.data === "object" ? raw.data : raw) as CardData;
   if (!d.name) return null;
+  const extra = d.extensions?.mirrorai;
   const persona = [
     d.description,
-    d.personality && `Personality: ${d.personality}`,
+    d.personality && !extra?.traits?.length && `Personality: ${d.personality}`,
     d.mes_example && `Example dialogue:\n${d.mes_example}`,
   ].filter(Boolean).join("\n\n");
   return {
@@ -69,6 +72,7 @@ function fromCard(raw: Record<string, unknown>): ImportedBot | null {
     greeting: d.first_mes ?? "",
     tags: Array.isArray(d.tags) ? d.tags.map(String).slice(0, 20) : [],
     source: spec,
+    extra: extra && typeof extra === "object" ? extra : undefined,
   };
 }
 

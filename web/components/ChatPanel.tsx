@@ -85,6 +85,20 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
     alert("thanks, we got the report.");
   }
 
+  async function reload(id: string) {
+    const { data: rows } = await supabase.from("messages").select("id, role, content").eq("chat_id", id).order("id");
+    setMessages((rows as Message[]) ?? []);
+  }
+
+  async function deleteFrom(m: Message) {
+    if (busy || typeof m.id !== "number" || !chatId) return;
+    if (!confirm("delete this message and everything after it?")) return;
+    const { error } = await supabase.rpc("delete_messages_from", { p_message_id: m.id });
+    if (error) return setError(error.message);
+    setMessages((ms) => ms.filter((x) => typeof x.id !== "number" || x.id < (m.id as number)));
+    if (m.role === "user") setDraft(m.content); // so a deleted message can be rewritten
+  }
+
   function restart() {
     if (!confirm("start over? this chat's history stays saved, but the bot starts fresh and you can pick a persona again.")) return;
     setChatId(null);
@@ -99,7 +113,9 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
     setBusy(true);
     setError("");
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", content }, { id: "pending", role: "assistant", content: "" }]);
+    let newChatId = chatId;
     for await (const ev of sendMessage(character.id, chatId, content, personaId)) {
+      if (ev.type === "chat") newChatId = ev.chat_id;
       if (ev.type === "chat" && ev.chat_id !== chatId) {
         setChatId(ev.chat_id);
         const { data } = personaId ? await supabase.from("personas").select("name").eq("id", personaId).single() : { data: null };
@@ -109,6 +125,7 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
       if (ev.type === "error") setError(ev.message);
     }
     setMessages((m) => m.filter((x) => !(x.id === "pending" && !x.content)).map((x) => (x.id === "pending" ? { ...x, id: `a${Date.now()}` } : x)));
+    if (newChatId) await reload(newChatId); // swap the temporary ids for real ones so messages can be deleted
     setBusy(false);
     window.dispatchEvent(new Event(CHATS_CHANGED));
   }
@@ -157,7 +174,14 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
           <p className="muted" style={{ textAlign: "center" }}><Link href="/login" style={{ color: "var(--accent)" }}>log in</Link> to chat</p>
         )}
         {character.greeting && <div className="bubble">{character.greeting}</div>}
-        {messages.map((m) => <div key={m.id} className={`bubble ${m.role}`}>{m.content || "…"}</div>)}
+        {messages.map((m) => (
+          <div key={m.id} className={`msg ${m.role}`}>
+            <div className={`bubble ${m.role}`}>{m.content || "…"}</div>
+            {typeof m.id === "number" && !busy && (
+              <button type="button" className="icon-btn msg-delete" title="delete this and everything after" aria-label="delete this and everything after" onClick={() => deleteFrom(m)}>🗑</button>
+            )}
+          </div>
+        ))}
         {error && <p className="error">{error}</p>}
       </div>
       <form className="composer" onSubmit={(e) => { e.preventDefault(); send(); }}>

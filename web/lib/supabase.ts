@@ -27,6 +27,10 @@ export type Character = {
   nsfw: boolean;
   nsfw_cover: boolean;
   minor: boolean; // character is under 18: always non-nsfw, can't be changed
+  background: string;
+  traits: string[];
+  quirks: Quirk[];
+  warmup: Warmup;
   anonymous: boolean;
 };
 
@@ -42,6 +46,11 @@ export type Profile = {
 };
 
 /** what shows up while browsing: non-nsfw only, everything, or nsfw only */
+export type Frequency = "always" | "often" | "sometimes" | "rarely";
+export type Quirk = { text: string; frequency: Frequency };
+/** how fast a bot warms up to the person chatting. slow is the default: hundreds of messages, not 20 */
+export type Warmup = "never" | "slow" | "normal";
+
 export type ContentFilter = "sfw" | "any" | "nsfw";
 export const CONTENT_FILTERS: { key: ContentFilter; label: string }[] = [
   { key: "sfw", label: "Non-NSFW" },

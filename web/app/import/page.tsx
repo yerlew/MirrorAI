@@ -1,8 +1,24 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { type Imported, parseImport } from "@/lib/transfer";
+import { type Imported, type ImportedBot, parseImport } from "@/lib/transfer";
 import { supabase } from "@/lib/supabase";
+
+/** our own personality fields from an export, checked since the file could say anything */
+function personality(x: ImportedBot["extra"]) {
+  if (!x) return {};
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  return {
+    background: str(x.background).slice(0, 8000),
+    traits: Array.isArray(x.traits) ? x.traits.filter((t) => typeof t === "string").slice(0, 20) : [],
+    quirks: Array.isArray(x.quirks)
+      ? x.quirks.filter((q) => q && typeof q.text === "string").slice(0, 20)
+        .map((q) => ({ text: q.text.slice(0, 200), frequency: ["always", "often", "sometimes", "rarely"].includes(q.frequency) ? q.frequency : "sometimes" }))
+      : [],
+    warmup: ["never", "slow", "normal"].includes(str(x.warmup)) ? x.warmup : "slow",
+    minor: x.minor === true,
+  };
+}
 
 export default function ImportPage() {
   const router = useRouter();
@@ -39,7 +55,7 @@ export default function ImportPage() {
       const { bot } = parsed;
       const { data: character, error: e1 } = await supabase.from("characters").insert({
         creator_id: auth.user.id, name: bot.name, tagline: bot.tagline, persona: bot.persona, scenario: bot.scenario,
-        greeting: bot.greeting, tags: bot.tags, visibility: "private", imported_from: bot.source,
+        greeting: bot.greeting, tags: bot.tags, visibility: "private", imported_from: bot.source, ...personality(bot.extra),
       }).select("id").single();
       if (e1) throw e1;
       if (parsed.messages.length) {
