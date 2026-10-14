@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CHATS_CHANGED } from "@/components/ChatList";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { PersonaPicker } from "@/components/PersonaPicker";
+import { RichText } from "@/components/RichText";
 import { sendMessage } from "@/lib/chat";
 import { type Character, creatorName, handleHref, type Message, profileName, supabase } from "@/lib/supabase";
 import { download, exportChat } from "@/lib/transfer";
@@ -173,10 +174,10 @@ export function ChatPanel({ id, pane, onClose }: { id: string; pane?: boolean; o
         {starting && !loggedIn && (
           <p className="muted" style={{ textAlign: "center" }}><Link href="/login" style={{ color: "var(--accent)" }}>log in</Link> to chat</p>
         )}
-        {character.greeting && <div className="bubble">{character.greeting}</div>}
+        {character.greeting && <div className="bubble"><RichText text={character.greeting} /></div>}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role}`}>
-            <div className={`bubble ${m.role}`}>{m.content || "…"}</div>
+            <div className={`bubble ${m.role}`}>{m.content ? <RichText text={m.content} user={m.role === "user"} /> : "…"}</div>
             {typeof m.id === "number" && !busy && (
               <button type="button" className="icon-btn msg-delete" title="delete this and everything after" aria-label="delete this and everything after" onClick={() => deleteFrom(m)}>🗑</button>
             )}

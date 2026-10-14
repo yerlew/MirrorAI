@@ -65,7 +65,9 @@ function systemPrompt(raw: Character, user: User, memory: string, pinned: string
     pinned && `Facts the user wants you to always remember. Treat them as true even if older parts of the chat say otherwise:\n<pinned_facts>\n${pinned}\n</pinned_facts>`,
     memory && `Your memory of earlier parts of this chat, which are no longer shown verbatim:\n<memory>\n${memory}\n</memory>\nStay consistent with it: names, relationships, what happened, and anything you promised.`,
     contentRules(c),
-    "Write natural replies in your own voice, matching the user's energy and length. Use *asterisks* for actions. Move the story forward; don't repeat yourself.",
+    "Write natural replies in your own voice, matching the user's energy and length. Move the story forward; don't repeat yourself.",
+    "Formatting: put everything that isn't spoken out loud (inner thoughts, actions, feelings, narration) in *single asterisks*. Use **double asterisks** to stress a word or phrase in speech. Spoken words get no asterisks. Don't use parentheses or brackets for thoughts.",
+    "The user marks their own unspoken thoughts and actions with *asterisks*, (parentheses) or [brackets]. Their actions happen in the scene, but their thoughts are private: you can't hear them, so react only to what they say and do, unless you'd plausibly read it on their face.",
   ].filter(Boolean).join("\n\n");
 }
 
