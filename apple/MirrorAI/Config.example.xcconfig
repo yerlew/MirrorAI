@@ -1,0 +1,4 @@
+// copy to Config.xcconfig (gitignored) and fill in from supabase → project settings → api
+// the $() stops xcconfig from reading // as a comment
+SUPABASE_URL = https:/$()/YOUR-PROJECT.supabase.co
+SUPABASE_ANON_KEY = your-anon-key
