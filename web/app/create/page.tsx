@@ -11,6 +11,9 @@ export default function Create() {
   const [f, setF] = useState({ name: "", tagline: "", avatar_url: "", art_credit: "", greeting: "", persona: "", scenario: "", tags: "", visibility: "public", gender: "" });
   const [categories, setCategories] = useState<string[]>([]);
   const [aiArt, setAiArt] = useState(false);
+  const [nsfw, setNsfw] = useState(false);
+  const [nsfwCover, setNsfwCover] = useState(false);
+  const [anonymous, setAnonymous] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
@@ -29,6 +32,9 @@ export default function Create() {
       gender: f.gender || null,
       categories,
       ai_art: aiArt,
+      nsfw,
+      nsfw_cover: nsfw || nsfwCover,
+      anonymous,
       tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean),
       creator_id: auth.user.id,
     }).select("id").single();
@@ -64,6 +70,20 @@ export default function Create() {
         <textarea rows={3} placeholder="scenario: where the chat starts (optional)" value={f.scenario} onChange={set("scenario")} />
         <textarea rows={3} placeholder="greeting: their first message" value={f.greeting} onChange={set("greeting")} />
         <input placeholder="extra tags, comma separated" value={f.tags} onChange={set("tags")} />
+        <label className="switch" style={{ marginLeft: 0 }}>
+          <input type="checkbox" role="switch" checked={nsfw} onChange={(e) => setNsfw(e.target.checked)} />
+          this bot is 18+ (hidden from anyone with the NSFW filter on)
+        </label>
+        {!nsfw && (
+          <label className="switch" style={{ marginLeft: 0 }}>
+            <input type="checkbox" role="switch" checked={nsfwCover} onChange={(e) => setNsfwCover(e.target.checked)} />
+            the cover image is 18+ (blurred for anyone with the filter on)
+          </label>
+        )}
+        <label className="switch" style={{ marginLeft: 0 }}>
+          <input type="checkbox" role="switch" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
+          post anonymously (your name and profile won't show on this bot)
+        </label>
         <select value={f.visibility} onChange={set("visibility")}>
           <option value="public">public</option>
           <option value="unlisted">unlisted (link only)</option>

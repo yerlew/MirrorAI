@@ -30,10 +30,22 @@ export default function ProfilePage() {
     if (!profile) return;
     setError("");
     const { error } = await supabase.from("profiles")
-      .update({ display_name: profile.display_name, username: profile.username?.toLowerCase() || null })
+      .update({ display_name: profile.display_name, username: profile.username?.toLowerCase() || null, bio: profile.bio })
       .eq("id", profile.id);
     if (error) setError(error.message.includes("username") ? "username: 3-24 chars, a-z 0-9 _ only, and not taken" : error.message);
     else setSaved("saved");
+  }
+
+  async function setNsfw(show: boolean) {
+    if (!profile) return;
+    let adult = profile.adult_confirmed_at;
+    if (show && !adult) {
+      if (!confirm("18+ content. confirm you're at least 18 years old.")) return;
+      adult = new Date().toISOString();
+    }
+    const { error } = await supabase.from("profiles").update({ show_nsfw: show, adult_confirmed_at: adult }).eq("id", profile.id);
+    if (error) return setError(error.message);
+    setProfile({ ...profile, show_nsfw: show, adult_confirmed_at: adult });
   }
 
   async function savePersona(e: React.FormEvent) {
@@ -71,12 +83,27 @@ export default function ProfilePage() {
           <label className="field">username
             <input value={profile.username ?? ""} placeholder="pick one" onChange={(e) => { setProfile({ ...profile, username: e.target.value }); setSaved(""); }} maxLength={24} />
           </label>
+          <label className="field">bio
+            <textarea rows={3} value={profile.bio ?? ""} maxLength={500} placeholder="shows on your public creator page" onChange={(e) => { setProfile({ ...profile, bio: e.target.value }); setSaved(""); }} />
+          </label>
           <div className="row">
             <button>save</button>
             <span className="muted">{saved}</span>
+            {profile.username && <Link href={`/u/${profile.username}`} className="muted" style={{ color: "var(--accent)" }}>view public page</Link>}
             <button type="button" className="btn-ghost" style={{ marginLeft: "auto" }} onClick={() => supabase.auth.signOut().then(() => (location.href = "/"))}>log out</button>
           </div>
         </form>
+      )}
+
+      {profile && (
+        <section className="panel">
+          <h2>Content</h2>
+          <label className="switch" style={{ marginLeft: 0 }}>
+            <input type="checkbox" role="switch" checked={!profile.show_nsfw} onChange={(e) => setNsfw(!e.target.checked)} />
+            NSFW filter {profile.show_nsfw ? "off: 18+ bots and covers show unfiltered" : "on: 18+ bots are hidden and 18+ covers are blurred"}
+          </label>
+          <p className="muted" style={{ margin: 0 }}>The website only. The iPhone and Mac apps always keep the filter on.</p>
+        </section>
       )}
 
       <section className="panel">

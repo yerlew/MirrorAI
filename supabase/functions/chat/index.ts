@@ -6,8 +6,14 @@ import Anthropic from "npm:@anthropic-ai/sdk@0.133";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MODEL = Deno.env.get("CHAT_MODEL") ?? "claude-opus-5-5";
-const WINDOW = 40; // recent messages sent verbatim; older ones live in chats.memory
-const FOLD_EVERY = 20; // fold this many overflow messages into memory at a time
+// memory model: every message after chats.memory_through is sent verbatim; everything before it lives in
+// chats.memory (auto summary) and chats.pinned (facts the user wrote, never touched by the model).
+// once more than WINDOW + FOLD_EVERY messages are unfolded, the oldest are folded down to WINDOW. the
+// verbatim history only grows between folds, so its prefix stays stable and prompt caching keeps hitting.
+const WINDOW = 80;
+const FOLD_EVERY = 40;
+const FOLD_CHUNK = 150; // messages per summarization call when catching up (e.g. after importing a long chat)
+const MAX_VERBATIM = 240; // hard cap per request if folding fell behind
 
 const anthropic = new Anthropic(); // ANTHROPIC_API_KEY from function secrets
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -17,7 +23,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
 };
 
-type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string };
+type Character = { id: string; name: string; persona: string; scenario: string; greeting: string; creator_id: string; visibility: string; nsfw: boolean };
 type Row = { id: number; role: "user" | "assistant"; content: string };
 type User = { name: string; backstory: string }; // who the bot is talking to
 
@@ -35,34 +41,60 @@ async function loadUser(userId: string, personaId: string | null, characterId: s
   return { name: profile?.display_name || profile?.username || "", backstory: "" };
 }
 
-function systemPrompt(c: Character, user: User, memory: string) {
+function systemPrompt(raw: Character, user: User, memory: string, pinned: string) {
+  // imported character cards use {{char}} / {{user}} placeholders
+  const fill = (t: string) => t.replaceAll("{{char}}", raw.name).replaceAll("{{user}}", user.name || "the user");
+  const c = { ...raw, persona: fill(raw.persona), scenario: fill(raw.scenario), greeting: fill(raw.greeting) };
   return [
     `You are ${c.name}, a character in an interactive roleplay chat. Stay in character for the whole conversation; never mention being an AI model unless the user steps out of the story and asks directly.`,
     `<persona>\n${c.persona}\n</persona>`,
     c.scenario && `<scenario>\n${c.scenario}\n</scenario>`,
     user.name && `You are talking with ${user.name}.${user.backstory ? ` What you know about them:\n<user_persona>\n${user.backstory}\n</user_persona>` : ""}`,
     c.greeting && `You opened the conversation with this line:\n<greeting>\n${c.greeting}\n</greeting>`,
-    memory && `What has happened so far in earlier parts of this chat:\n<memory>\n${memory}\n</memory>`,
+    pinned && `Facts the user wants you to always remember. Treat them as true even if older parts of the chat say otherwise:\n<pinned_facts>\n${pinned}\n</pinned_facts>`,
+    memory && `Your memory of earlier parts of this chat, which are no longer shown verbatim:\n<memory>\n${memory}\n</memory>\nStay consistent with it: names, relationships, what happened, and anything you promised.`,
     "Write natural replies in your own voice, matching the user's energy and length. Use *asterisks* for actions. Move the story forward; don't repeat yourself.",
   ].filter(Boolean).join("\n\n");
 }
 
-async function foldMemory(chatId: string, memory: string, memoryThrough: number) {
-  const { data: rows } = await admin.from("messages").select("id, role, content")
-    .eq("chat_id", chatId).gt("id", memoryThrough).order("id", { ascending: false }).limit(WINDOW + FOLD_EVERY);
-  if (!rows || rows.length < WINDOW + FOLD_EVERY) return;
-  const overflow = (rows as Row[]).slice(WINDOW).reverse();
-  const transcript = overflow.map((m) => `${m.role}: ${m.content}`).join("\n");
-  const res = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 2000,
-    output_config: { effort: "low" },
-    system: "You maintain the long-term memory of a roleplay chat. Merge the new transcript into the existing memory: keep names, relationships, facts the user shared about themselves, promises and ongoing plot threads. Drop small talk. Write terse bullet points, under 400 words. Output only the updated memory.",
-    messages: [{ role: "user", content: `<memory>\n${memory}\n</memory>\n<transcript>\n${transcript}\n</transcript>` }],
-  });
-  const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-  if (res.stop_reason === "end_turn" && text) {
-    await admin.from("chats").update({ memory: text, memory_through: overflow.at(-1)!.id }).eq("id", chatId);
+const MEMORY_SYSTEM = `You maintain the long-term memory of an ongoing roleplay chat between a user and a character. You get the current memory and a new stretch of transcript; output the updated memory.
+
+Keep everything a reader would need to continue the story seamlessly: names, relationships and how they changed, facts the user shared about themselves, places, possessions, injuries, promises, secrets, running jokes and nicknames, the emotional state between them, and unresolved plot threads. Drop small talk. Newer facts replace older ones they contradict.
+
+Use these sections, as terse bullets, under 900 words in total:
+## People & relationships
+## About the user
+## Story so far (chronological)
+## Open threads & promises
+
+Output only the updated memory.`;
+
+/** fold everything older than the last WINDOW unfolded messages into chats.memory, in chunks */
+async function foldMemory(chatId: string) {
+  for (let round = 0; round < 50; round++) {
+    const { data: chat } = await admin.from("chats").select("memory, memory_through").eq("id", chatId).single();
+    if (!chat) return;
+    const { count } = await admin.from("messages").select("id", { count: "exact", head: true })
+      .eq("chat_id", chatId).gt("id", chat.memory_through);
+    if (!count || count <= WINDOW + FOLD_EVERY) return;
+    const take = Math.min(count - WINDOW, FOLD_CHUNK);
+    const { data: rows } = await admin.from("messages").select("id, role, content")
+      .eq("chat_id", chatId).gt("id", chat.memory_through).order("id").limit(take);
+    if (!rows?.length) return;
+    const transcript = (rows as Row[]).map((m) => `${m.role}: ${m.content}`).join("\n\n");
+    const res = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 4000,
+      output_config: { effort: "low" },
+      system: MEMORY_SYSTEM,
+      messages: [{ role: "user", content: `<memory>\n${chat.memory}\n</memory>\n<transcript>\n${transcript}\n</transcript>` }],
+    });
+    const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").trim();
+    if (res.stop_reason !== "end_turn" || !text) return;
+    // only advance if nobody else folded in the meantime
+    const { data: updated } = await admin.from("chats").update({ memory: text, memory_through: rows.at(-1)!.id })
+      .eq("id", chatId).eq("memory_through", chat.memory_through).select("id");
+    if (!updated?.length) return;
   }
 }
 
@@ -85,11 +117,15 @@ Deno.serve(async (req) => {
   if (!character || (character.visibility === "private" && character.creator_id !== userId)) {
     return new Response("character not found", { status: 404, headers: cors });
   }
+  if (character.nsfw) {
+    const { data: me } = await admin.from("profiles").select("show_nsfw").eq("id", userId).single();
+    if (!me?.show_nsfw) return new Response("this bot is 18+ and your nsfw filter is on", { status: 403, headers: cors });
+  }
 
-  type Chat = { id: string; memory: string; memory_through: number; persona_id: string | null };
+  type Chat = { id: string; memory: string; pinned: string; memory_through: number; persona_id: string | null };
   let chat: Chat | null = null;
   if (body.chat_id) {
-    const { data } = await admin.from("chats").select("id, memory, memory_through, persona_id")
+    const { data } = await admin.from("chats").select("id, memory, pinned, memory_through, persona_id")
       .eq("id", body.chat_id).eq("user_id", userId).eq("character_id", character.id).single();
     chat = data;
     if (!chat) return new Response("chat not found", { status: 404, headers: cors });
@@ -101,7 +137,7 @@ Deno.serve(async (req) => {
       personaId = persona.id;
     }
     const { data, error } = await admin.from("chats").insert({ user_id: userId, character_id: character.id, persona_id: personaId })
-      .select("id, memory, memory_through, persona_id").single();
+      .select("id, memory, pinned, memory_through, persona_id").single();
     if (error) return new Response(error.message, { status: 500, headers: cors });
     chat = data;
   }
@@ -109,7 +145,7 @@ Deno.serve(async (req) => {
   const user = await loadUser(userId, chat.persona_id, character.id);
   await admin.from("messages").insert({ chat_id: chat.id, role: "user", content });
   const { data: recent } = await admin.from("messages").select("id, role, content")
-    .eq("chat_id", chat.id).gt("id", chat.memory_through).order("id", { ascending: false }).limit(WINDOW);
+    .eq("chat_id", chat.id).gt("id", chat.memory_through).order("id", { ascending: false }).limit(MAX_VERBATIM);
   const history = ((recent ?? []) as Row[]).reverse();
   while (history.length && history[0].role === "assistant") history.shift(); // must open on a user turn
 
@@ -128,7 +164,8 @@ Deno.serve(async (req) => {
           betas: ["server-side-fallback-2026-07-01"],
           // deno-lint-ignore no-explicit-any
           fallbacks: "default" as any, // on a policy decline the api retries on a fallback model
-          system: systemPrompt(character, user, chat!.memory),
+          cache_control: { type: "ephemeral" }, // caches the stable system + history prefix between turns
+          system: systemPrompt(character, user, chat!.memory, chat!.pinned),
           messages: history.map((m) => ({ role: m.role, content: m.content })),
         });
         for await (const ev of s) {
@@ -150,7 +187,7 @@ Deno.serve(async (req) => {
         send(controller, { type: "error", message: "something broke, try again." });
       }
       controller.close();
-      const fold = foldMemory(chat!.id, chat!.memory, chat!.memory_through).catch(console.error);
+      const fold = foldMemory(chat!.id).catch(console.error);
       // deno-lint-ignore no-explicit-any
       (globalThis as any).EdgeRuntime?.waitUntil?.(fold);
     },

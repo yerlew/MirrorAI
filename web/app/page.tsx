@@ -2,13 +2,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CATEGORIES, type Category, GENDERS, type Gender } from "@/lib/discovery";
-import { type Character, profileName, supabase } from "@/lib/supabase";
+import { type Character, compact, creatorName, myProfile, supabase } from "@/lib/supabase";
 
 const NO_AI_ART_KEY = "mirror.noAiArt";
-
-function compact(n: number) {
-  return Intl.NumberFormat("en", { notation: "compact" }).format(n);
-}
 
 export default function ForYou() {
   const [chars, setChars] = useState<Character[]>([]);
@@ -16,9 +12,11 @@ export default function ForYou() {
   const [gender, setGender] = useState<Gender>("all");
   const [category, setCategory] = useState<Category>("recommended");
   const [noAiArt, setNoAiArt] = useState(false);
+  const [showNsfw, setShowNsfw] = useState<boolean | null>(null); // null until we know
 
   useEffect(() => {
     try { setNoAiArt(localStorage.getItem(NO_AI_ART_KEY) === "1"); } catch {}
+    myProfile().then((p) => setShowNsfw(p?.show_nsfw ?? false));
   }, []);
 
   function toggleAiArt(on: boolean) {
@@ -27,14 +25,16 @@ export default function ForYou() {
   }
 
   useEffect(() => {
+    if (showNsfw === null) return;
     // "recommended" is popularity for now; swap in a real ranking later
-    let query = supabase.from("characters").select("*, creator:profiles(display_name, username)").eq("visibility", "public").order("chat_count", { ascending: false }).limit(60);
+    let query = supabase.from("character_cards").select("*").eq("visibility", "public").order("chat_count", { ascending: false }).limit(60);
     if (q.trim()) query = query.ilike("name", `%${q.trim()}%`);
     if (gender !== "all") query = query.eq("gender", gender);
     if (category !== "recommended") query = query.contains("categories", [category]);
     if (noAiArt) query = query.eq("ai_art", false);
+    if (!showNsfw) query = query.eq("nsfw", false); // nsfw filter on: adult bots never show up
     query.then(({ data }) => setChars((data as Character[]) ?? []));
-  }, [q, gender, category, noAiArt]);
+  }, [q, gender, category, noAiArt, showNsfw]);
 
   return (
     <main>
@@ -64,14 +64,14 @@ export default function ForYou() {
           <Link key={c.id} href={`/c/${c.id}`} className="card">
             <div className="art">
               {c.name[0]}
-              {c.avatar_url && <img src={c.avatar_url} alt="" />}
+              {c.avatar_url && <img src={c.avatar_url} alt="" className={c.nsfw_cover && !showNsfw ? "blur" : undefined} />}
               <span className="count">💬 {compact(c.chat_count)}</span>
               {c.art_credit && <span className="credit">art: {c.art_credit}</span>}
             </div>
             <div className="body">
               <span className="name">{c.name}</span>
               {c.tagline && <span className="tagline">{c.tagline}</span>}
-              {c.creator && <span className="muted">by {profileName(c.creator)}</span>}
+              <span className="muted">by {creatorName(c)}</span>
               {c.tags.length > 0 && (
                 <div className="tags">{c.tags.slice(0, 4).map((t) => <span key={t} className="tag">{t}</span>)}</div>
               )}

@@ -2,9 +2,21 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { CHATS_CHANGED } from "@/components/ChatList";
+import { MemoryPanel } from "@/components/MemoryPanel";
 import { PersonaPicker } from "@/components/PersonaPicker";
 import { sendMessage } from "@/lib/chat";
-import { type Character, type Message, profileName, supabase } from "@/lib/supabase";
+import { type Character, creatorName, type Message, profileName, supabase } from "@/lib/supabase";
+import { download, exportChat } from "@/lib/transfer";
+
+const REPORT_REASONS = [
+  ["mislabeled_nsfw", "adult content not marked 18+"],
+  ["minor_sexualized", "sexualizes a minor"],
+  ["illegal", "illegal content"],
+  ["harassment", "harassment or targets a real person"],
+  ["spam", "spam"],
+  ["other", "something else"],
+] as const;
 
 export default function Chat() {
   const { id } = useParams<{ id: string }>();
@@ -18,17 +30,21 @@ export default function Chat() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showNsfw, setShowNsfw] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
-      const { data: c } = await supabase.from("characters").select("*, creator:profiles(display_name, username)").eq("id", id).single<Character>();
+      const { data: c } = await supabase.from("character_cards").select("*").eq("id", id).maybeSingle<Character>();
       setCharacter(c);
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) return;
       setLoggedIn(true);
-      const { data: me } = await supabase.from("profiles").select("display_name, username").eq("id", auth.user.id).single();
+      const { data: me } = await supabase.from("profiles").select("display_name, username, show_nsfw").eq("id", auth.user.id).single();
       setProfileLabel(profileName(me));
+      setShowNsfw(me?.show_nsfw ?? false);
       // resume the most recent chat with this character, if any
       const { data: chat } = await supabase.from("chats").select("id, persona:personas(name)").eq("character_id", id)
         .order("updated_at", { ascending: false }).limit(1).maybeSingle<{ id: string; persona: { name: string } | null }>();
@@ -44,6 +60,26 @@ export default function Chat() {
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages]);
+
+  async function exportThis() {
+    if (!character) return;
+    let memory = "", pinned = "", covers = 0;
+    if (chatId) {
+      const { data } = await supabase.from("chats").select("memory, pinned, memory_through").eq("id", chatId).single();
+      memory = data?.memory ?? "";
+      pinned = data?.pinned ?? "";
+      covers = messages.filter((m) => typeof m.id === "number" && m.id <= (data?.memory_through ?? 0)).length;
+    }
+    download(`${character.name.replace(/[^\w-]+/g, "_")}.mirrorai.json`, exportChat(character, messages, memory, pinned, covers));
+  }
+
+  async function report(reason: string) {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user || !character) return;
+    await supabase.from("reports").insert({ reporter_id: auth.user.id, character_id: character.id, reason });
+    setReporting(false);
+    alert("thanks, we got the report.");
+  }
 
   function restart() {
     if (!confirm("start over? this chat's history stays saved, but the bot starts fresh and you can pick a persona again.")) return;
@@ -70,17 +106,38 @@ export default function Chat() {
     }
     setMessages((m) => m.filter((x) => !(x.id === "pending" && !x.content)).map((x) => (x.id === "pending" ? { ...x, id: `a${Date.now()}` } : x)));
     setBusy(false);
+    window.dispatchEvent(new Event(CHATS_CHANGED));
   }
 
   if (!character) return <main className="muted">loading…</main>;
+  if (character.nsfw && !showNsfw) {
+    return (
+      <main style={{ maxWidth: 520 }}>
+        <div className="panel">
+          <h2>{character.name} is marked 18+</h2>
+          <p className="muted" style={{ margin: 0 }}>Your NSFW filter is on. You can turn it off on your <Link href="/profile" style={{ color: "var(--accent)" }}>profile</Link> if you're an adult.</p>
+        </div>
+      </main>
+    );
+  }
   const starting = !chatId && messages.length === 0;
 
   return (
     <div className="chat">
-      {chatId && (
-        <div className="chat-top">
-          <span>chatting as <strong style={{ color: "var(--text)" }}>{chattingAs || "you"}</strong></span>
-          <button className="btn-ghost" onClick={restart} disabled={busy}>restart chat</button>
+      <div className="chat-top">
+        {chatId ? <span>chatting as <strong style={{ color: "var(--text)" }}>{chattingAs || "you"}</strong></span> : <span />}
+        <div className="row" style={{ marginLeft: "auto" }}>
+          {chatId && <button className="btn-ghost" onClick={() => setMemoryOpen((v) => !v)}>memory</button>}
+          <button className="btn-ghost" onClick={exportThis}>export</button>
+          {chatId && <button className="btn-ghost" onClick={restart} disabled={busy}>restart</button>}
+          {loggedIn && <button className="btn-ghost" onClick={() => setReporting((v) => !v)}>report</button>}
+        </div>
+      </div>
+      {memoryOpen && chatId && <MemoryPanel chatId={chatId} onClose={() => setMemoryOpen(false)} />}
+      {reporting && (
+        <div className="panel" style={{ margin: "8px 16px" }}>
+          <h3>Report {character.name}</h3>
+          <div className="row">{REPORT_REASONS.map(([k, label]) => <button key={k} className="btn-ghost" onClick={() => report(k)}>{label}</button>)}</div>
         </div>
       )}
       <div className="log" ref={logRef}>
@@ -88,7 +145,8 @@ export default function Chat() {
           <strong style={{ color: "var(--text)" }}>{character.name}</strong>
           <br />
           {character.tagline}
-          {character.creator && <><br />by {profileName(character.creator)}</>}
+          <br />
+          by {character.creator_username ? <Link href={`/u/${character.creator_username}`} style={{ color: "var(--accent)" }}>{creatorName(character)}</Link> : creatorName(character)}
         </div>
         {starting && loggedIn && (
           <PersonaPicker characterId={character.id} characterName={character.name} profileLabel={profileLabel} value={personaId} onChange={setPersonaId} />
