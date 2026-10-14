@@ -4,7 +4,7 @@
   --bg: #0a0a0c;
   --surface: #141418;
   --surface-2: #1e1e24;
-  --line: #2a2a32;
+  --line: #6a2850; /* borders and dividers: dim pink so they read as pink without glowing */
   --text: #f5f5f7;
   --muted: #9d9daa;
   --accent: #ff4fa3;
