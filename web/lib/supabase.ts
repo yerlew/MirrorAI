@@ -93,10 +93,38 @@ export type CreatorProfile = {
   display_name: string | null;
   avatar_url: string | null;
   bio: string;
-  follower_count: number;
+  follower_count: number; // "supporters"
+  subscriber_count: number; // followers who get notified when you post
+  following_count: number; // "subscriptions": who you follow
+  post_count: number;
   bot_count: number;
   total_chats: number;
 };
+
+/** a row of the post_cards view. a reply has a parent_id */
+export type Post = {
+  id: number;
+  author_id: string;
+  parent_id: number | null;
+  body: string;
+  like_count: number;
+  reply_count: number;
+  created_at: string;
+  author_name: string | null;
+  author_handle: string | null;
+  author_avatar: string | null;
+  liked: boolean;
+};
+
+/** "now", "5m", "3h", "2d", then a date */
+export function ago(iso: string) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  if (s < 7 * 86400) return `${Math.floor(s / 86400)}d`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: s > 300 * 86400 ? "numeric" : undefined });
+}
 
 // private, only ever readable by their owner
 export type Persona = { id: string; user_id: string; name: string; backstory: string; avatar_url: string | null };

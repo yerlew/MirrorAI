@@ -1,6 +1,6 @@
 "use client";
-import { Account } from "@/components/Account";
+import { ProfileView } from "@/components/ProfileView";
 
 export default function UserPage() {
-  return <Account section="user" />;
+  return <ProfileView />;
 }

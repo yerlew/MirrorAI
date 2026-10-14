@@ -1,17 +1,16 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CONTENT_FILTERS, type ContentFilter, type Persona, type Profile, handleHref, supabase, usernameProblem } from "@/lib/supabase";
+import { CONTENT_FILTERS, type ContentFilter, type Persona, type Profile, supabase } from "@/lib/supabase";
 
-export type AccountSection = "user" | "profiles" | "settings";
+export type AccountSection = "profiles" | "settings";
 
-/** user = your public profile, profiles = your private personas, settings = filter + account */
+/** profiles = your private personas, settings = filter + account. your public page is ProfileView */
 export function Account({ section }: { section: AccountSection }) {
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [editing, setEditing] = useState<Partial<Persona> | null>(null);
-  const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -27,19 +26,6 @@ export function Account({ section }: { section: AccountSection }) {
       setPersonas((ps as Persona[]) ?? []);
     })();
   }, []);
-
-  async function saveProfile(e: React.FormEvent) {
-    e.preventDefault();
-    if (!profile) return;
-    setError("");
-    const problem = usernameProblem(profile.username ?? "");
-    if (problem) return setError(problem);
-    const { data, error } = await supabase.from("profiles")
-      .update({ display_name: profile.display_name, username: profile.username?.trim(), bio: profile.bio })
-      .eq("id", profile.id).select().single<Profile>();
-    if (error) setError(error.message);
-    else { setProfile(data); setSaved("saved"); }
-  }
 
   async function setFilter(f: ContentFilter) {
     if (!profile) return;
@@ -73,28 +59,6 @@ export function Account({ section }: { section: AccountSection }) {
 
   return (
     <main style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 820 }}>
-      {profile && section === "user" && (
-        <form className="panel" onSubmit={saveProfile}>
-          <h2>Profile</h2>
-          <p className="muted" style={{ margin: 0 }}>Public. This is the name on your comments and the bots you post.</p>
-          <label className="field">display name
-            <input value={profile.display_name ?? ""} onChange={(e) => { setProfile({ ...profile, display_name: e.target.value }); setSaved(""); }} maxLength={40} />
-          </label>
-          <label className="field">username {profile.handle && <span>· you're <strong style={{ color: "var(--text)" }}>{profile.handle}</strong></span>}
-            <input value={profile.username ?? ""} placeholder="pick one" onChange={(e) => { setProfile({ ...profile, username: e.target.value }); setSaved(""); }} maxLength={32} />
-            <span>Anything goes except #. Your #number is permanent, like a license plate: it stays the same if you change your name.</span>
-          </label>
-          <label className="field">bio
-            <textarea rows={3} value={profile.bio ?? ""} maxLength={500} placeholder="shows on your public creator page" onChange={(e) => { setProfile({ ...profile, bio: e.target.value }); setSaved(""); }} />
-          </label>
-          <div className="row">
-            <button>save</button>
-            <span className="muted">{saved}</span>
-            {profile.handle && <Link href={handleHref(profile.handle)} className="muted" style={{ color: "var(--accent)" }}>view public page</Link>}
-          </div>
-        </form>
-      )}
-
       {profile && section === "settings" && (
         <section className="panel">
           <h2>Settings</h2>
