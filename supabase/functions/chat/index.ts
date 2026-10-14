@@ -5,10 +5,13 @@
 import Anthropic from "npm:@anthropic-ai/sdk@0.133";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// sfw bots run on claude. 18+ bots run on an openrouter model, since claude won't write explicit content.
-const MODEL = Deno.env.get("CHAT_MODEL") ?? "claude-opus-5-5";
-const NSFW_MODEL = Deno.env.get("NSFW_MODEL") ?? "sao10k/l3.3-euryale-70b"; // any openrouter model id
+// every bot runs on openrouter (OPENROUTER_API_KEY). SFW_MODEL / NSFW_MODEL take any model id from openrouter.ai/models.
+// setting ANTHROPIC_API_KEY moves the non-nsfw bots onto claude (CHAT_MODEL) instead.
+const SFW_MODEL = Deno.env.get("SFW_MODEL") ?? "deepseek/deepseek-chat";
+const NSFW_MODEL = Deno.env.get("NSFW_MODEL") ?? "sao10k/l3.3-euryale-70b";
 const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
+const MODEL = Deno.env.get("CHAT_MODEL") ?? "claude-opus-5-5";
+const USE_CLAUDE = !!Deno.env.get("ANTHROPIC_API_KEY");
 // memory model: every message after chats.memory_through is sent verbatim; everything before it lives in
 // chats.memory (auto summary) and chats.pinned (facts the user wrote, never touched by the model).
 // once more than WINDOW + FOLD_EVERY messages are unfolded, the oldest are folded down to WINDOW. the
@@ -18,7 +21,7 @@ const FOLD_EVERY = 40;
 const FOLD_CHUNK = 150; // messages per summarization call when catching up (e.g. after importing a long chat)
 const MAX_VERBATIM = 240; // hard cap per request if folding fell behind
 
-const anthropic = new Anthropic(); // ANTHROPIC_API_KEY from function secrets
+const anthropic = USE_CLAUDE ? new Anthropic() : null; // ANTHROPIC_API_KEY from function secrets
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 const cors = {
@@ -142,7 +145,7 @@ class Refusal extends Error {}
 
 /** streams reply text from whichever model this bot runs on */
 async function* generate(nsfw: boolean, system: string, messages: Turn[], maxTokens: number): AsyncGenerator<string> {
-  if (nsfw) return yield* openrouter(system, messages, maxTokens);
+  if (nsfw || !anthropic) return yield* openrouter(nsfw ? NSFW_MODEL : SFW_MODEL, system, messages, maxTokens);
   const s = anthropic.beta.messages.stream({
     model: MODEL,
     max_tokens: maxTokens,
@@ -161,12 +164,12 @@ async function* generate(nsfw: boolean, system: string, messages: Turn[], maxTok
   if (final.stop_reason === "refusal") throw new Refusal();
 }
 
-async function* openrouter(system: string, messages: Turn[], maxTokens: number): AsyncGenerator<string> {
+async function* openrouter(model: string, system: string, messages: Turn[], maxTokens: number): AsyncGenerator<string> {
   if (!OPENROUTER_KEY) throw new Error("OPENROUTER_API_KEY is not set");
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: NSFW_MODEL, stream: true, max_tokens: maxTokens, messages: [{ role: "system", content: system }, ...messages] }),
+    body: JSON.stringify({ model, stream: true, max_tokens: maxTokens, messages: [{ role: "system", content: system }, ...messages] }),
   });
   if (!res.ok || !res.body) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
